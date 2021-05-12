@@ -46,7 +46,7 @@ class Ur:
         self.safety_length_end = 2 if mode == 'classic' else 0
         self.safety_length_start = 4
 
-        self.turn = self.winner = self.board = self.count = self.finished = self.backup_data = None
+        self.turn = self.winner = self.board = self.move_count = self.finished = self.backup_data = None
         self.reset()
 
     def reset(self):
@@ -55,7 +55,7 @@ class Ur:
         self.board = np.zeros(shape=(2, self.width + 1), dtype=np.int8)
         self.board[0, self.start] = self.n_pieces
         self.board[1, self.start] = self.n_pieces
-        self.count = 0
+        self.move_count = 0
         self.finished = False
         self.roll()
 
@@ -70,7 +70,7 @@ class Ur:
 
         moves = []
         for start in range(self.width - self.rolled):
-            if self.is_legal_start(start):
+            if self.is_legal_move(start):
                 moves.append(start)
 
         if not moves:
@@ -78,15 +78,17 @@ class Ur:
 
         return moves
 
-    def is_legal_start(self, start):
-        # Will only be given start squares on the board, that result in end squares on the board (or finish).
+    def is_legal_move(self, move):
         # Conditions under which it's false:
-
-        # 1. no player stone to move
-        if self.board[self.turn, start] == 0:
+        # 0. either start or end square off the board
+        if not self.start <= move <= self.finish - self.rolled:
             return False
 
-        end = start + self.rolled
+        # 1. no player stone to move
+        if self.board[self.turn, move] == 0:
+            return False
+
+        end = move + self.rolled
 
         # 2. player occupies end square, and it's not the finish square
         if self.board[self.turn, end] == 1 and end != self.finish:
@@ -99,17 +101,23 @@ class Ur:
         # otherwise it's legal
         return True
 
-    def play_move(self, start):
-        # will only be given legal moves, move is the square whose stone to move
-        # returns the reward given to the played move
-        self.count += 1
-        if start == 'pass':
+    def play_move(self, move):
+        # move is the square whose stone to move
+        self.move_count += 1
+        if move == 'pass':  # TODO: need to check if this is legal too (can only pass if no other moves)
             self.turn = self.other()
             self.roll()
             return
 
-        end = start + self.rolled
-        self.board[self.turn, start] -= 1
+        if not self.is_legal_move(move):
+            # lose game
+            self.finished = True
+            self.winner = self.other()
+            self.turn = -1
+            return
+
+        end = move + self.rolled
+        self.board[self.turn, move] -= 1
         self.board[self.turn, end] += 1
 
         # captures
@@ -137,16 +145,16 @@ class Ur:
 
     # to allow n-step methods and planning
     def get_state(self):
-        return self.board, self.turn, self.rolled, self.winner, self.count
+        return self.board, self.turn, self.rolled, self.winner, self.move_count
 
     def set_state(self, state):
-        self.board, self.turn, self.rolled, self.winner, self.count = state
+        self.board, self.turn, self.rolled, self.winner, self.move_count = state
 
     def backup(self):
         self.backup_data = self.get_state()
 
     def restore_backup(self):
-        self.board, self.turn, self.rolled, self.winner, self.count = self.backup_data
+        self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_data
 
     # Last 3 functions only for display purposes
     def display(self):
