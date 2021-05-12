@@ -182,6 +182,47 @@ class Ur:
     def restore_backup(self):
         self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_data
 
+    # testing
+    def check_valid_board(self):
+        board = self.board
+
+        if board.dtype != 'int8':
+            return 'not ints'
+
+        on_board = board[:, self.start + 1:self.finish]
+        if np.max(on_board) > 1:
+            return 'more than one stone on square'
+        if np.min(on_board) < 0:
+            return 'less than 0 stones on square'
+        if np.sum(board[0][self.start: self.finish + 1]) != self.n_pieces:
+            return 'number of pieces not conserved (player 0)'
+        if np.sum(board[1][self.start: self.finish + 1]) != self.n_pieces:
+            return 'number of pieces not conserved (player 1)'
+        if not (0 <= board[0, self.start] <= self.n_pieces):
+            return 'illegal start pieces (player 0)'
+        if not (0 <= board[1, self.start] <= self.n_pieces):
+            return 'illegal start pieces (player 1)'
+        if not (0 <= board[0, self.finish] <= self.n_pieces):
+            return 'illegal start pieces (player 0)'
+        if not (0 <= board[1, self.finish] <= self.n_pieces):
+            return 'illegal start pieces (player 1)'
+
+        roll_info = board[:, self.roll_index]
+        if not (min(roll_info) == 0 and 0 <= max(roll_info) <= (self.die_faces - 1) * self.n_die):
+            return 'illegal roll/turn'
+
+        overlap_board = board[:, self.safety_length_start + 1: -self.safety_length_end - 2]
+        if not (np.sum(overlap_board, axis=0) <= np.ones(self.finish - self.safety_length_start
+                                                         - self.safety_length_end - 1, dtype='int8')).all():
+            return 'overlapping stones'
+
+        if self.winner != -1:
+            if board[self.winner, self.finish] != self.n_pieces:
+                return "winner hasn't finished yet"
+            if board[(self.winner + 1) % 2, self.finish] == self.n_pieces:
+                return "loser has won before winner"
+        return True
+
     # Last 3 functions only for display purposes
     def display(self):
         board_display = self.reshape_board()
