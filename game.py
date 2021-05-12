@@ -51,7 +51,7 @@ class Ur:
         self.display_width = 8 if mode == 'classic' else 10
 
         # state
-        self.rolled = self.turn = self.winner = self.board = self.move_count = self.finished = self.backup_data = None
+        self.rolled = self.turn = self.winner = self.board = self.move_count = self.backup_data = None
         self.reset()
 
     def reset(self):
@@ -61,7 +61,6 @@ class Ur:
         self.board[0, self.start] = self.n_pieces
         self.board[1, self.start] = self.n_pieces
         self.move_count = 0
-        self.finished = False
         self.roll()
 
     def roll(self):
@@ -141,7 +140,6 @@ class Ur:
 
         if not self.is_legal_move(move):
             # lose game
-            self.finished = True
             self.winner = self.other()
             self.turn = -1
             return
@@ -169,7 +167,6 @@ class Ur:
 
     def has_finished(self):
         if self.board[0, self.finish] == self.n_pieces or self.board[1, self.finish] == self.n_pieces:
-            self.finished = True
             self.winner = self.turn
             self.turn = -1
             return True
