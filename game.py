@@ -3,10 +3,6 @@ from matplotlib import pyplot as plt
 from matplotlib import colors
 
 
-# TODO: allow printing of raw state
-# TODO: -1's as indicators, replace by None or False?
-
-
 class Ur:
     """
     The Ur board looks like this:
@@ -136,6 +132,10 @@ class Ur:
 
     def play_move(self, move):
         # move is the square whose stone to move
+        if self.winner != -1:
+            print('game already finished.')
+            return
+
         self.move_count += 1
 
         if not self.is_legal_move(move):
@@ -207,11 +207,11 @@ class Ur:
         t_x, t_y = 4.2, 0.7
         # stones at start and finish
         stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]
-        colors = ['r', 'r', 'b', 'b']
+        player_colors = ['r', 'r', 'b', 'b']
         x_start = 4
         x_finish = self.display_width - self.safety_length_end - 1
         positions = [(x_start, 0), (x_finish, 0), (x_start, 2), (x_finish, 2)]
-        for s, c, (x, y) in zip(stats, colors, positions):
+        for s, c, (x, y) in zip(stats, player_colors, positions):
             plt.text(x + .3, y + .7, f'{s}', fontsize=24, color=c)
 
         # turn and throw
