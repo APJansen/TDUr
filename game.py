@@ -2,10 +2,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import colors
 
-# TODO: add roll and turn info to raw state
+
 # TODO: allow printing of raw state
 # TODO: -1's as indicators, replace by None or False?
-# TODO: hunt down numbers and remove
 
 
 class Ur:
@@ -20,12 +19,15 @@ class Ur:
     ------------------------------------
     where s and f are not part of the board, but can be seen as the places where stones that still
     have to go through (s) or have already finished (f) are located.
+    To fully specify a game state, this needs to be supplemented with the last die throw and whose turn it is.
+
     we unroll this and copy the middle row that's shared between the two players, to give:
+    ------------------------------------------------------------------------
+    s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f | t |
     ----------------------------------------------------------------------
-    | s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
-    ----------------------------------------------------------------------
-    | s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
-    ----------------------------------------------------------------------
+    s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f | t |
+    ------------------------------------------------------------------------
+    where t = 0 for the player whose turn it is not, and it is equal to the last die throw for the other.
     """
 
     def __init__(self, mode='classic'):
@@ -36,9 +38,13 @@ class Ur:
         self.n_die = 4
         self.die_faces = 2
         self.rolled = -1
+        self.start = 0
+        self.finish = 15
+        self.roll_index = 16
 
         self.display_width = 8 if mode == 'classic' else 10
-        self.safety_length = 2 if mode == 'classic' else 0
+        self.safety_length_end = 2 if mode == 'classic' else 0
+        self.safety_length_start = 4
 
         self.turn = self.winner = self.board = self.count = self.finished = self.backup_data = None
         self.reset()
@@ -46,15 +52,17 @@ class Ur:
     def reset(self):
         self.turn = 0
         self.winner = -1
-        self.board = np.zeros(shape=(2, self.width), dtype=np.int8)
-        self.board[0, 0] = self.n_pieces
-        self.board[1, 0] = self.n_pieces
+        self.board = np.zeros(shape=(2, self.width + 1), dtype=np.int8)
+        self.board[0, self.start] = self.n_pieces
+        self.board[1, self.start] = self.n_pieces
         self.count = 0
         self.finished = False
         self.roll()
 
     def roll(self):
         self.rolled = np.sum(np.random.randint(self.die_faces, size=self.n_die))
+        self.board[self.turn, self.roll_index] = self.rolled
+        self.board[self.other(), self.roll_index] = 0
 
     def legal_moves(self):
         if self.rolled == 0:
@@ -67,18 +75,21 @@ class Ur:
 
         if not moves:
             moves = ['pass']
+
         return moves
 
     def is_legal_start(self, start):
+        # Will only be given start squares on the board, that result in end squares on the board (or finish).
         # Conditions under which it's false:
+
         # 1. no player stone to move
         if self.board[self.turn, start] == 0:
             return False
 
-        # 2. player occupies end square
         end = start + self.rolled
-        end_val = self.board[self.turn, end]
-        if end_val > 0 and end != self.width - 1:
+
+        # 2. player occupies end square, and it's not the finish square
+        if self.board[self.turn, end] == 1 and end != self.finish:
             return False
 
         # 3. end square is the safe space and the opponent occupies it
@@ -95,23 +106,26 @@ class Ur:
         if start == 'pass':
             self.turn = self.other()
             self.roll()
-            return 0
+            return
 
         end = start + self.rolled
         self.board[self.turn, start] -= 1
         self.board[self.turn, end] += 1
 
-        if 4 < end < self.width - 1 - self.safety_length and self.board[self.other(), end] == 1:
+        # captures
+        if (self.board[self.other(), end] == 1 and  # opponent stone present
+                self.safety_length_start < end < self.width - 1 - self.safety_length_end):  # and in capturable zone
             self.board[self.other(), end] = 0
-            self.board[self.other(), 0] += 1
+            self.board[self.other(), self.start] += 1
 
+        # change turn?
         if not self.has_finished():
-            self.roll()
             if end not in self.rosettes:
                 self.turn = self.other()
+            self.roll()
 
     def has_finished(self):
-        if self.board[0, -1] == self.n_pieces or self.board[1, -1] == self.n_pieces:
+        if self.board[0, self.finish] == self.n_pieces or self.board[1, self.finish] == self.n_pieces:
             self.finished = True
             self.winner = self.turn
             self.turn = -1
@@ -145,22 +159,23 @@ class Ur:
 
     def reshape_board(self):
         reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
-        reshaped_board[1] = self.board[0, 5:-self.safety_length - 1] - self.board[1, 5:-self.safety_length - 1]
+        reshaped_board[1] = (self.board[0, self.safety_length_start + 1:-self.safety_length_end - 2] -
+                             self.board[1, self.safety_length_start + 1:-self.safety_length_end - 2])
         for player in [0, 1]:
             sign = (1 - 2 * player)
-            reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:5])
-            if self.safety_length:
-                reshaped_board[2 * player, -self.safety_length:] = sign * np.flip(
-                    self.board[player, -self.safety_length - 1:-1])
+            reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self.safety_length_start + 1])
+            if self.safety_length_end:
+                reshaped_board[2 * player, -self.safety_length_end:] = sign * np.flip(
+                    self.board[player, -self.safety_length_end - 2:-2])
         return reshaped_board
 
     def annotate_board(self):
         t_x, t_y = 4.2, 0.7
         # stones at start and finish
-        stats = [self.board[ij] for ij in [(0, 0), (0, -1), (1, 0), (1, -1)]]
+        stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]
         colors = ['r', 'r', 'b', 'b']
         x_start = 4
-        x_finish = self.display_width - self.safety_length - 1
+        x_finish = self.display_width - self.safety_length_end - 1
         positions = [(x_start, 0), (x_finish, 0), (x_start, 2), (x_finish, 2)]
         for s, c, (x, y) in zip(stats, colors, positions):
             plt.text(x + .3, y + .7, f'{s}', fontsize=24, color=c)
