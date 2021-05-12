@@ -159,18 +159,14 @@ class Ur:
             self.board[self.other(), end] = 0
             self.board[self.other(), self.start] += 1
 
-        # change turn?
-        if not self.has_finished():
+        # check if the game is finished
+        if self.board[self.turn, self.finish] == self.n_pieces:
+            self.winner = self.turn
+            self.turn = -1
+        else:
             if end not in self.rosettes:
                 self.turn = self.other()
             self.roll()
-
-    def has_finished(self):
-        if self.board[0, self.finish] == self.n_pieces or self.board[1, self.finish] == self.n_pieces:
-            self.winner = self.turn
-            self.turn = -1
-            return True
-        return False
 
     def other(self):
         return (self.turn + 1) % 2
