@@ -31,28 +31,33 @@ class Ur:
     """
 
     def __init__(self, mode='classic'):
-        self.rosettes = [4, 8, 14]
-        self.safe_square = 8
-        self.n_pieces = 7
-        self.width = 16
-        self.n_die = 4
-        self.die_faces = 2
-        self.rolled = -1
+        # board
         self.start = 0
         self.finish = 15
         self.roll_index = 16
-
-        self.display_width = 8 if mode == 'classic' else 10
+        self.rosettes = [4, 8, 14]
+        self.safe_square = 8
         self.safety_length_end = 2 if mode == 'classic' else 0
         self.safety_length_start = 4
 
-        self.turn = self.winner = self.board = self.move_count = self.finished = self.backup_data = None
+        # piece
+        self.n_pieces = 7
+
+        # die
+        self.n_die = 4
+        self.die_faces = 2
+
+        # display
+        self.display_width = 8 if mode == 'classic' else 10
+
+        # state
+        self.rolled = self.turn = self.winner = self.board = self.move_count = self.finished = self.backup_data = None
         self.reset()
 
     def reset(self):
         self.turn = 0
         self.winner = -1
-        self.board = np.zeros(shape=(2, self.width + 1), dtype=np.int8)
+        self.board = np.zeros(shape=(2, self.finish + 2), dtype=np.int8)
         self.board[0, self.start] = self.n_pieces
         self.board[1, self.start] = self.n_pieces
         self.move_count = 0
@@ -69,7 +74,7 @@ class Ur:
             return ['pass']
 
         moves = []
-        for start in range(self.width - self.rolled):
+        for start in range(self.finish + 1 - self.rolled):
             if self.is_legal_move(start):
                 moves.append(start)
 
@@ -152,7 +157,7 @@ class Ur:
 
         # captures
         if (self.board[self.other(), end] == 1 and  # opponent stone present
-                self.safety_length_start < end < self.width - 1 - self.safety_length_end):  # and in capturable zone
+                self.safety_length_start < end < self.finish - self.safety_length_end):  # and in capturable zone
             self.board[self.other(), end] = 0
             self.board[self.other(), self.start] += 1
 
