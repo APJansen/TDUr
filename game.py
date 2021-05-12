@@ -32,7 +32,7 @@ class Ur:
 
     def __init__(self, mode='classic'):
         self.rosettes = [4, 8, 14]
-        self.safe_space = 8
+        self.safe_square = 8
         self.n_pieces = 7
         self.width = 16
         self.n_die = 4
@@ -64,7 +64,7 @@ class Ur:
         self.board[self.turn, self.roll_index] = self.rolled
         self.board[self.other(), self.roll_index] = 0
 
-    def legal_moves(self):
+    def legal_moves_slow(self):
         if self.rolled == 0:
             return ['pass']
 
@@ -78,13 +78,35 @@ class Ur:
 
         return moves
 
+    def legal_moves(self):
+        if self.rolled == 0:
+            return ['pass']
+
+        # start square is within range and contains a stone to move
+        moves_with_legal_start = self.board[self.turn, :self.finish + 1 - self.rolled] > 0
+
+        # end square is within range and does not contain player stone (or is finish)
+        moves_with_legal_end = self.board[self.turn, self.rolled: self.finish + 1] == 0
+        moves_with_legal_end[-1] = True
+
+        # almost legal
+        moves = np.where(moves_with_legal_start & moves_with_legal_end)[0]
+
+        # last check: moving to opponent occupied safe square
+        if self.board[self.other(), self.safe_square] == 1:
+            moves = moves[moves != self.safe_square - self.rolled]
+
+        moves = moves.tolist()
+
+        if not moves:
+            moves = ['pass']
+
+        return moves
+
     def is_legal_move(self, move):
         # 0. a pass is only legal if there are no other moves
         if move == 'pass':
-            if self.legal_moves() == ['pass']:
-                return True
-            else:
-                return False
+            return self.legal_moves() == ['pass']
 
         # Conditions under which it's false:
         # 1. either start or end square off the board
@@ -102,7 +124,7 @@ class Ur:
             return False
 
         # 4. end square is the safe space and the opponent occupies it
-        if end == self.safe_space and self.board[self.other(), self.safe_space] == 1:
+        if end == self.safe_square and self.board[self.other(), self.safe_square] == 1:
             return False
 
         # otherwise it's legal
