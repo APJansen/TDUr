@@ -79,22 +79,29 @@ class Ur:
         return moves
 
     def is_legal_move(self, move):
+        # 0. a pass is only legal if there are no other moves
+        if move == 'pass':
+            if self.legal_moves() == ['pass']:
+                return True
+            else:
+                return False
+
         # Conditions under which it's false:
-        # 0. either start or end square off the board
+        # 1. either start or end square off the board
         if not self.start <= move <= self.finish - self.rolled:
             return False
 
-        # 1. no player stone to move
+        # 2. no player stone to move
         if self.board[self.turn, move] == 0:
             return False
 
         end = move + self.rolled
 
-        # 2. player occupies end square, and it's not the finish square
+        # 3. player occupies end square, and it's not the finish square
         if self.board[self.turn, end] == 1 and end != self.finish:
             return False
 
-        # 3. end square is the safe space and the opponent occupies it
+        # 4. end square is the safe space and the opponent occupies it
         if end == self.safe_space and self.board[self.other(), self.safe_space] == 1:
             return False
 
@@ -104,16 +111,17 @@ class Ur:
     def play_move(self, move):
         # move is the square whose stone to move
         self.move_count += 1
-        if move == 'pass':  # TODO: need to check if this is legal too (can only pass if no other moves)
-            self.turn = self.other()
-            self.roll()
-            return
 
         if not self.is_legal_move(move):
             # lose game
             self.finished = True
             self.winner = self.other()
             self.turn = -1
+            return
+
+        if move == 'pass':
+            self.turn = self.other()
+            self.roll()
             return
 
         end = move + self.rolled
