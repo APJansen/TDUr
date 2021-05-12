@@ -141,7 +141,6 @@ class Ur:
         if not self.is_legal_move(move):
             # lose game
             self.winner = self.other()
-            self.turn = -1
             return
 
         if move == 'pass':
@@ -162,7 +161,6 @@ class Ur:
         # check if the game is finished
         if self.board[self.turn, self.finish] == self.n_pieces:
             self.winner = self.turn
-            self.turn = -1
         else:
             if end not in self.rosettes:
                 self.turn = self.other()
