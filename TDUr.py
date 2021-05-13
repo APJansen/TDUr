@@ -48,6 +48,14 @@ class TDUr:
 
         return moves[jnp.argmax(values)]
 
+    def TD_error(self, game, move):
+        v_current = self.value(game.board)
+        game.play_move(self.policy(game))
+        v_next = self.value(game.board)
+        reward = game.reward()
+
+        return reward + v_next - v_current
+
     @staticmethod
     def sigma(z):
         return 1 / (1 + jnp.exp(-z))
