@@ -33,6 +33,16 @@ class TDUr:
         self.W1 = jnp.random.randn(self.hidden_units, self.input_units)
         self.W2 = jnp.random.randn(1, self.hidden_units)
 
+    def policy(self, game):
+        moves = game.legal_moves()
+        if moves == ['pass']:
+            return 'pass'
+
+
+        values = np.dot(features, self.weights)
+
+        return moves[np.argmax(values)]
+
     @staticmethod
     def sigma(z):
         return 1 / (1 + jnp.exp(-z))

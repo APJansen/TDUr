@@ -172,9 +172,17 @@ class Ur:
         self.board[self.turn, self.turn_index] = 0
         self.board[self.other(), self.turn_index] = 1
 
+    def reward(self):
+        if self.winner == -1:
+            return 0
+        elif self.winner == 1:
+            return 1
+        elif self.winner == 0:
+            return -1
+
     # to allow n-step methods and planning
     def get_state(self):
-        return self.board, self.turn, self.rolled, self.winner, self.move_count
+        return self.board.copy(), self.turn, self.rolled, self.winner, self.move_count
 
     def set_state(self, state):
         self.board, self.turn, self.rolled, self.winner, self.move_count = state
@@ -184,6 +192,14 @@ class Ur:
 
     def restore_backup(self):
         self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_data
+
+    def simulate_move(self, move):
+        self.backup()
+        self.play_move(move)
+        reward = self.reward()
+        board = self.board.copy()
+        self.restore_backup()
+        return reward, board
 
     # testing
     def check_valid_board(self):
@@ -263,7 +279,7 @@ class Ur:
 
         # rosettes
         for (y, x) in [(0, 0), (2, 0), (1, 3), (0, 6), (2, 6)]:
-            plt.text(t_x + x - 4 - .1, t_y + y + .1, 'O', fontsize=36, color='black')
+            plt.text(t_x + x - 4 - .08, t_y + y + .2, 'X', fontsize=48, color='black')
 
         # make it pretty
         ax = plt.gca()
