@@ -6,9 +6,10 @@ import haiku as hk
 
 class TDUr:
 
-    def __init__(self, hidden_units=80):
+    def __init__(self, hidden_units=80, epsilon=0.01):
         self.input_units = 34
         self.hidden_units = hidden_units
+        self.epsilon = epsilon
         self.W1 = jnp.random.randn(hidden_units, 34)
         self.W2 = jnp.random.randn(1, hidden_units)
         self.rescale = jnp.ones(shape=(2, 17))
@@ -37,6 +38,9 @@ class TDUr:
         moves = game.legal_moves()
         if moves == ['pass']:
             return 'pass'
+
+        if jnp.random.uniform() < self.epsilon:
+            return jnp.random.choice(moves)
 
         values = []
         rewards = []
