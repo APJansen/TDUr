@@ -23,14 +23,14 @@ class Ur:
     ----------------------------------------------------------------------
     s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f | t |
     ------------------------------------------------------------------------
-    where t = 0 for the player whose turn it is not, and it is equal to the last die throw for the other.
+    where t = 0 for the player whose turn it is not, and 1 for the other.
     """
 
     def __init__(self, mode='classic'):
         # board
         self.start = 0
         self.finish = 15
-        self.roll_index = 16
+        self.turn_index = 16
         self.rosettes = [4, 8, 14]
         self.safe_square = 8
         self.safety_length_end = 2 if mode == 'classic' else 0
@@ -61,8 +61,6 @@ class Ur:
 
     def roll(self):
         self.rolled = np.sum(np.random.randint(self.die_faces, size=self.n_die))
-        self.board[self.turn, self.roll_index] = self.rolled
-        self.board[self.other(), self.roll_index] = 0
 
     def legal_moves_slow(self):
         if self.rolled == 0:
@@ -144,7 +142,7 @@ class Ur:
             return
 
         if move == 'pass':
-            self.turn = self.other()
+            self.change_turn()
             self.roll()
             return
 
@@ -163,11 +161,16 @@ class Ur:
             self.winner = self.turn
         else:
             if end not in self.rosettes:
-                self.turn = self.other()
+                self.change_turn()
             self.roll()
 
     def other(self):
         return (self.turn + 1) % 2
+
+    def change_turn(self):
+        self.turn = self.other()
+        self.board[self.turn, self.turn_index] = 0
+        self.board[self.other(), self.turn_index] = 1
 
     # to allow n-step methods and planning
     def get_state(self):
@@ -207,7 +210,7 @@ class Ur:
         if not (0 <= board[1, self.finish] <= self.n_pieces):
             return 'illegal start pieces (player 1)'
 
-        roll_info = board[:, self.roll_index]
+        roll_info = board[:, self.turn_index]
         if not (min(roll_info) == 0 and 0 <= max(roll_info) <= (self.die_faces - 1) * self.n_die):
             return 'illegal roll/turn'
 
