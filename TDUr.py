@@ -2,6 +2,7 @@ import jax as jx
 import numpy as jnp
 import haiku as hk
 
+# TODO: take into account which player the agent is
 
 class TDUr:
 
@@ -13,8 +14,7 @@ class TDUr:
         self.rescale = jnp.ones(shape=(2, 17))
         self.rescale[:, 0] = self.rescale[:, 15] = 7 * jnp.ones(shape=2)
 
-    def value(self, game):
-        board = game.board
+    def value(self, board):
         rescaled = board / self.rescale
         input = rescaled.flatten()
         A1 = jnp.dot(self.W1, input)
@@ -38,10 +38,15 @@ class TDUr:
         if moves == ['pass']:
             return 'pass'
 
+        values = []
+        rewards = []
+        for move in moves:
+            # possible optimization here: get features of all moves and multiply as matrix
+            reward, board = game.simulate_move(move)
+            values.append(self.value(board))
+            rewards.append(reward)
 
-        values = np.dot(features, self.weights)
-
-        return moves[np.argmax(values)]
+        return moves[jnp.argmax(values)]
 
     @staticmethod
     def sigma(z):
