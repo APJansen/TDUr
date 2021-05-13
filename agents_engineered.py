@@ -33,6 +33,21 @@ def pi_capture(game):
         pi_furthest(game)
 
 
+class EngineeredPolicy:
+
+    def __init__(self, weights):
+        self.weights = np.array(weights)
+
+    def move(self, game):
+        moves = game.legal_moves()
+        if moves == ['pass']:
+            return 'pass'
+
+        features = np.array([all_features(game, move) for move in moves])
+        values = np.dot(features, self.weights)
+
+        return moves[np.argmax(values)]
+
 #
 # def pi_save(game):
 #     # prefer move to safe finish area

@@ -1,10 +1,12 @@
 import jax as jx
 import numpy as jnp
+import haiku as hk
 
 
 class TDUr:
 
     def __init__(self, hidden_units=80):
+        self.input_units = 34
         self.hidden_units = hidden_units
         self.W1 = jnp.random.randn(hidden_units, 34)
         self.W2 = jnp.random.randn(1, hidden_units)
@@ -28,8 +30,8 @@ class TDUr:
         self.W2 = W2
 
     def init_weights(self):
-        self.W1 = jnp.random.randn(hidden_units, 34)
-        self.W2 = jnp.random.randn(1, hidden_units)
+        self.W1 = jnp.random.randn(self.hidden_units, self.input_units)
+        self.W2 = jnp.random.randn(1, self.hidden_units)
 
     @staticmethod
     def sigma(z):
