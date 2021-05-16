@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import numpy as np
-from jax import grad, random
+from jax import grad, random, jit, vmap
 
 
 def relu(x):
@@ -11,7 +11,9 @@ def sigma(x):
     return 1. / (1. + jnp.exp(-x))
 
 
-def compute_value(params, board, turn):
+@jit
+def compute_value(params, board):
+    # Value as seen from player 0
     activations = jnp.reshape(board, -1)
     for w, b in params[:-1]:
         outputs = jnp.dot(w, activations) + b
@@ -20,7 +22,11 @@ def compute_value(params, board, turn):
     final_w, final_b = params[-1]
     logits = jnp.reshape(jnp.dot(final_w, activations) + final_b, (()))
 
-    return sigma(logits) if turn == 0 else (1 - sigma(logits))
+    return sigma(logits)
+
+
+value_grad = jit(grad(compute_value))
+compute_values = jit(vmap(compute_value, in_axes=(None, 0)))
 
 
 def random_layer_params(m, n, key, scale=1e-2):
@@ -40,11 +46,11 @@ class TDUr:
         self.hidden_units = hidden_units
         self.params = init_network_params([self.input_units, self.hidden_units, 1], key)
 
-    def value(self, board, turn):
-        return compute_value(self.params, board, turn)
+    def value(self, board):
+        return compute_value(self.params, board)
 
-    def value_gradient(self, board, turn):
-        return grad(compute_value)(self.params, board, turn)
+    def value_gradient(self, board):
+        return value_grad(self.params, board)
 
     def get_params(self):
         return self.params
@@ -66,23 +72,8 @@ class TDUr:
         if np.random.uniform() < epsilon:  # TODO: replace with jax's random
             return np.random.choice(moves)
 
-        values = []
-        rewards = []
-        for move in moves:
-            # TODO: possible optimization here: get features of all moves and multiply as matrix
-            reward, board = game.simulate_move(move, checks)
-            turn = 0 if board[0, game.turn_index] == 1 else 0  # TODO: make nicer
-            values.append(self.value(board, turn))
-            rewards.append(reward)
-            # what do I do with rewards? Include here or not?
+        boards = jnp.array([game.simulate_move(move, checks)[1] for move in moves])
+        values = compute_values(self.params, boards)
 
         chosen_move = moves[jnp.argmax(jnp.array(values))]
         return chosen_move
-
-    def TD_error(self, game, move):
-        v_current = self.value(game.board)
-        game.play_move(self.policy(game))
-        v_next = self.value(game.board)
-        reward = game.reward()
-
-        return reward + v_next - v_current

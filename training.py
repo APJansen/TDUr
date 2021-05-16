@@ -14,8 +14,6 @@ def update_eligibility(eligibility, decay, grad_value):
     return [(decay * z_w + dv_dw, decay * z_b + dv_db) for (z_w, z_b), (dv_dw, dv_db) in zip(eligibility, grad_value)]
 
 
-# TODO: training both sides, should we have 2 eligibility traces? Or just change signs?
-# actually min max? introduce sign in say learning rate but leave everything else fixed for player 0's values?
 def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100):
     outcomes = np.zeros(shape=episodes)
 
@@ -23,16 +21,16 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
         game.reset()
         finished = False
         eligibility = init_eligibility([agent.input_units, agent.hidden_units, 1])
-        new_value = agent.value(game.board, game.turn)
+        new_value = agent.value(game.board)
 
         while not finished:
             value = new_value
-            grad_value = agent.value_gradient(game.board, 0)
+            grad_value = agent.value_gradient(game.board)
 
             game.play_move(agent.policy(game, epsilon), checks)
 
             reward = game.reward()
-            new_value = agent.value(game.board, game.turn)
+            new_value = agent.value(game.board)
             TD_error = reward + discount * new_value - value
 
             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
