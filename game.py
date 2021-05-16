@@ -128,18 +128,19 @@ class Ur:
         # otherwise it's legal
         return True
 
-    def play_move(self, move):
+    def play_move(self, move, checks=True):
         # move is the square whose stone to move
-        if self.winner != -1:
-            print('game already finished.')
-            return
+        if checks:
+            if self.winner != -1:
+                print('game already finished.')
+                return
+
+            if not self.is_legal_move(move):
+                # lose game
+                self.winner = self.other()
+                return
 
         self.move_count += 1
-
-        if not self.is_legal_move(move):
-            # lose game
-            self.winner = self.other()
-            return
 
         if move == 'pass':
             self.change_turn()
@@ -175,9 +176,10 @@ class Ur:
     def reward(self):
         if self.winner == -1:
             return 0
-        elif self.winner == 1:
-            return 1
         elif self.winner == 0:
+            # note if there's a winner the turn no longer changes
+            return 1
+        else:
             return -1
 
     # to allow n-step methods and planning
@@ -193,9 +195,9 @@ class Ur:
     def restore_backup(self):
         self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_data
 
-    def simulate_move(self, move):
+    def simulate_move(self, move, checks=True):
         self.backup()
-        self.play_move(move)
+        self.play_move(move, checks)
         reward = self.reward()
         board = self.board.copy()
         self.restore_backup()
