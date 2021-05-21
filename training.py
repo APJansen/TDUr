@@ -24,56 +24,16 @@ def get_TD_error(new_value, value, reward, winner, discount):
     if winner == -1:
         return reward + discount * new_value - value
     else:
+        # when the game has been won, the reward itself is the total return, shouldn't bootstrap anymore.
         return reward - value
 
-# def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100):
-#     outcomes = np.zeros(shape=episodes, dtype='int8')
-#     start = time.time()
-#     total_moves = 0
-#
-#     for episode in range(episodes):
-#         game.reset()
-#         finished = False
-#         eligibility = init_eligibility([agent.input_units, agent.hidden_units, 1])
-#         new_value = agent.value(game.board)
-#
-#         while not finished:
-#             value = new_value
-#             grad_value = agent.value_gradient(game.board)
-#
-#             game.play_move(agent.policy(game, epsilon), checks)
-#
-#             reward = game.reward()
-#             new_value = agent.value(game.board)
-#             TD_error = reward + discount * new_value - value
-#
-#             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
-#
-#             agent.update_params((1 - 2 * game.turn) * learning_rate * TD_error, eligibility)
-#
-#             if game.winner != -1:
-#                 finished = True
-#                 outcomes[episode] = game.winner
-#                 total_moves += game.move_count
-#
-#         if episode % iprint == 0 and episode > 0:
-#             end = time.time()
-#             print(f'Trained for {episode} episodes, player 0 won '
-#                   f'{np.sum(outcomes[episode - iprint:episode]):d} of the last set of {iprint} games, '
-#                   f'this batch took {(end - start) / total_moves * 1000:.2f} s/(1k moves) and '
-#                   f'{total_moves/iprint:.0f} moves per game.')
-#             start = end
-#             total_moves = 0
-#
-#     return outcomes
 
-
-def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100):
-    outcomes = np.zeros(shape=episodes, dtype='int8')
+def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100, save=False):
+    outcomes = np.zeros(shape=episodes + 1, dtype='int8')
     start = time.time()
     total_moves = 0
 
-    for episode in range(episodes):
+    for episode in range(episodes + 1):
         game.reset()
         finished = False
         eligibility = init_eligibility([agent.input_units, agent.hidden_units, 1])
@@ -84,7 +44,6 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
             value = new_value
             grad_value = agent.value_gradient(game.board)
 
-            moves = game.legal_moves()
             move = agent.policy(game, epsilon)
             game.play_move(move, checks)
 
@@ -92,11 +51,7 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
             # the only point where turn number should enter is in choosing the next move, which is max/min on that
             reward = game.reward()
             new_value = agent.value(game.board)
-            # if there's no winner, compute normal TD error, otherwise no need to bootstrap, return is reward.
-            # if game.winner == -1:
-            #     TD_error = reward + discount * new_value - value
-            # else:
-            #     TD_error = reward - value
+
             TD_error = get_TD_error(new_value, value, reward, game.winner, discount)
 
             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
@@ -115,10 +70,14 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
                   f'{total_moves/iprint:.0f} moves per game.')
             start = end
             total_moves = 0
+            if save:
+                agent.save_params(save + f'-episodes{episode:d}')
 
     return outcomes
 
 
+# The 2 functions below were just to test everything before adding complications of self play.
+# They haven't been updated and probably won't work, need to either get rid of them or update them.
 # Start simpler: train vs random, with the agent always being player 0
 def train_vs_random(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, iprint=100):
     outcomes = np.zeros(shape=episodes)

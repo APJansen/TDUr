@@ -2,15 +2,9 @@ import jax.numpy as jnp
 import numpy as np
 from jax import grad, random, jit, vmap
 from jax.nn import relu, sigmoid
-from functools import partial
+import os
+import pickle
 
-
-# def relu(x):
-#     return jnp.maximum(0, x)
-#
-#
-# def sigma(x):
-#     return 1. / (1. + jnp.exp(-x))
 
 # shouldn't value(flip(board)) = 1 - value(board)? how to impose?
 # can use this symmetry: always compute value of board where it's player 0's turn.
@@ -36,35 +30,12 @@ def compute_value(params, board):
     return zero * value + one * (1 - value)
 
 
-# value_grad_turn_zero = jit(grad(compute_value_turn_zero))
-# value_grad_turn_one = jit(grad(compute_value_turn_one))
-#
-#
-# @jit
-# def compute_value_turn_one(params, board):
-#     return 1 - compute_value(params, jnp.flip(board, axis=0))
-#
-#
-# def compute_value(params, board, turn):
-#     if turn == 0:
-#         return compute_value_turn_zero(params, board)
-#     else:
-#         return compute_value_turn_one(params, board)
-#
-#
-# def value_grad(params, board, turn):
-#     if turn == 0:
-#         return value_grad_turn_zero(params, board)
-#     else:
-#         return value_grad_turn_one(params, board)
-
-
 value_grad = jit(grad(compute_value))
 compute_values = jit(vmap(compute_value, in_axes=(None, 0)))
 
 
 @jit
-def min_max_move(moves, values, turn):
+def min_max_move(values, turn):
     return jnp.argmax((1 - 2 * turn) * values)
 
 
@@ -94,10 +65,6 @@ class TDUr:
     def value(self, board):
         # computes value as seen from player 0
         return compute_value(self.params, board)
-        # if turn == 0:
-        #     return compute_value(self.params, board)
-        # else:
-        #     return compute_value_reversed(self.params, board)
 
     def value_gradient(self, board):
         return value_grad(self.params, board)
@@ -111,8 +78,8 @@ class TDUr:
     def init_params(self):
         self.params = init_network_params([self.input_units, self.hidden_units, 1], self.key)
 
-    def save_params(self, name, directory=''):
-        return # TODO: implement save params
+    def save_params(self, name, directory='parameters'):
+        pickle.dump(self.params, open(os.path.join(directory, name + '.pkl'), "wb"))
 
     def update_params(self, scalar, eligibility):
         self.params = get_new_params(self.params, scalar, eligibility)
@@ -122,18 +89,13 @@ class TDUr:
         if moves == ['pass']:
             return 'pass'
 
-        if np.random.uniform() < epsilon:  # TODO: replace with jax's random
+        if np.random.uniform() < epsilon:  # TODO: replace with jax's random?
             return np.random.choice(moves)
 
-        # boards = jnp.array([game.simulate_move(move, checks)[1] for move in moves]) # TODO: parallelize?
         boards = game.simulate_moves(moves)
         values = compute_values(self.params, boards)
-        # if game.turn == 0:
-        #     values = compute_values(self.params, boards)
-        # else:
-        #     # values = 1 - compute_values(self.params, jnp.array([jnp.flip(board, axis=0) for board in boards]))
-        #     values = 1 - compute_values(self.params, jnp.flip(boards, axis=1))
 
-        #chosen_move = moves[jnp.argmax(jnp.array(values)) if game.turn == 0 else jnp.argmin(jnp.array(values))]
-        chosen_move = moves[min_max_move(moves, values, game.turn)]
+        chosen_move = moves[min_max_move(values, game.turn)]
         return chosen_move
+
+    pickle.load

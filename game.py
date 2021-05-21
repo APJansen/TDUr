@@ -27,63 +27,16 @@ def legal_moves_array(board, turn, rolled):
 
     legal_moves = moves_with_legal_start & moves_with_legal_end & no_illegal_capture
 
-    return legal_moves #jnp.pad(legal_moves, (0, rolled + 1))
+    return legal_moves
 
 
-# def get_board_diff(move, end, turn):
-#     board_diff = jnp.zeros(shape=(2, 17), dtype='int8')
-#     board_diff = index_update(board_diff, (index[turn, turn], index[move, end]), (-1, +1))
-#
-#     rosettes = [4, 8, 14]
-#     if end in rosettes:
-#         return board_diff, turn
-#     else:
-#         board_diff = index_update(board_diff, (index[turn, (turn + 1) % 2], index[-1, -1]), (-1, +1))
-#         if 5 <= end <= 12:
-#             board_diff = index_update(board_diff, index[(turn + 1) % 2, end], -1)
-#         return board_diff, (turn + 1) % 2
-
-# @partial(jit, static_argnums=(0,1,2))
-# def get_board_diff(move, end, turn):
-#     board_diff = np.zeros(shape=(2, 17), dtype='int8')
-#     # board_diff = index_update(board_diff, (index[turn, turn], index[move, end]), (-1, +1))
-#     board_diff[turn, move] = -1
-#     board_diff[turn, end] = +1
-#
-#     rosettes = [4, 8, 14]
-#     if end in rosettes:
-#         return board_diff, turn, False
-#     else:
-#         other = (turn + 1) % 2
-#         # board_diff = index_update(board_diff, (index[turn, other], index[-1, -1]), (-1, +1))
-#         board_diff[turn, -1] = -1
-#         board_diff[other, -1] = +1
-#         if 5 <= end <= 12:
-#             #board_diff = index_update(board_diff, index[other, end], -1)
-#             board_diff[other, end] = -1
-#             capture = True
-#         else:
-#             capture = False
-#         return board_diff, other, capture
-#
-#
-# def move_board(board, move, end, turn):
-#     board_diff, new_turn, capture = get_board_diff(move, end, turn)
-#     new_board = board + board_diff # jnp.maximum(board + board_diff, 0)
-#     return new_board, new_turn, capture
-
-
-# can definitely get rid of control flow based on end, and remove it as static_argnum,
-# by creating boards with 1's at rosettes and another with 1's at capturable squares
-# not sure if it's worth doing though
-# NOTE: reason it seemed to work before was simply that it stopped after one move because it wasn't conserving pieces
-# problem arises later
-#@partial(jit, static_argnums=2)
 @jit
 def get_new_board(board, move, rolled, turn):
     end = move + rolled
+    # move player's stone forward
     indices_x, indices_y, values = [turn, turn], [move, end], [board[turn, move] - 1, board[turn, end] + 1]
 
+    # construct auxiliary boards to help with logic
     rosettes = [4, 8, 14]
     rosette_board = jnp.zeros(shape=17, dtype='int8')
     for i in rosettes:
@@ -91,26 +44,17 @@ def get_new_board(board, move, rolled, turn):
     capture_board = jnp.zeros(shape=17, dtype='int8')
     capture_board = index_update(capture_board, (index[5:13]), 1)
 
+    # change turn, unless ending on a rosette
     other = (turn + 1) % 2
     new_turn = (turn + 1 + rosette_board[end]) % 2
     indices_x, indices_y = indices_x + [turn, other], indices_y + [-1, -1]
     values = values + [0 + rosette_board[end], 1 - rosette_board[end]]
 
+    # capture, if opponent present and in capturable area
     start = 0
     indices_x, indices_y = indices_x + [other, other], indices_y + [end, start]
-    values = values + [(1 - capture_board[end]) * board[other, end], board[other, start] + capture_board[end] * board[other, end]]
-
-    # if end not in rosettes:
-    #     other = (turn + 1) % 2
-    #     new_turn = other
-    #     indices_x, indices_y = indices_x + [turn, other], indices_y + [-1, -1]
-    #     values = values + [0, 1]
-    #     if 5 <= end <= 12:
-    #         start = 0
-    #         indices_x, indices_y = indices_x + [other, other], indices_y + [end, start]
-    #         values = values + [0, board[other, start] + board[other, end]] #[-board[other, end], +board[other, end]]
-    # else:
-    #     new_turn = turn
+    values = values + [(1 - capture_board[end]) * board[other, end],
+                       board[other, start] + capture_board[end] * board[other, end]]
 
     board_new = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
     finish, n_pieces = 15, 7
@@ -119,25 +63,6 @@ def get_new_board(board, move, rolled, turn):
 
 
 get_new_boards = jit(vmap(get_new_board, in_axes=(None, 0, None, None)))
-
-
-@partial(jit, static_argnums=2)
-def sim_move(board, move, end, turn):
-    new_board = index_update(board,
-                             (index[turn, turn], index[move, end]),
-                             (board[turn, move] - 1, board[turn, end] + 1))
-
-    rosettes = [4, 8, 14]
-    if end not in rosettes:
-        # if it is, don't change turn, and no need to check for captures
-        # change turn
-        new_board = index_update(new_board, (index[turn, (turn + 1) % 2], index[-1, -1]), (0, 1))
-
-        # capture, if end in capturable zone
-        if 5 <= end <= 12:
-            new_board = index_update(new_board, index[(turn + 1) % 2, end], 0)
-
-    return new_board
 
 
 class Ur:
@@ -216,45 +141,15 @@ class Ur:
 
         return moves
 
-    # def legal_moves(self):
-    #     if self.rolled == 0:
-    #         return ['pass']
-    #
-    #     # start square is within range and contains a stone to move
-    #     moves_with_legal_start = self.board[self.turn, :self.finish + 1 - self.rolled] > 0
-    #
-    #     # end square is within range and does not contain player stone (or is finish)
-    #     moves_with_legal_end = self.board[self.turn, self.rolled: self.finish + 1] == 0
-    #     moves_with_legal_end[-1] = True
-    #
-    #     # almost legal
-    #     moves = np.where(moves_with_legal_start & moves_with_legal_end)[0]
-    #
-    #     # last check: moving to opponent occupied safe square
-    #     if self.board[self.other, self.safe_square] == 1:
-    #         moves = moves[moves != self.safe_square - self.rolled]
-    #
-    #     moves = moves.tolist()
-    #
-    #     if not moves:
-    #         moves = ['pass']
-    #
-    #     return moves
-
     def legal_moves(self):
         if self.rolled == 0:
             moves = []
         else:
-            # print('gets here twice?')
-            # print('board', type(self.board), self.board.dtype, self.board.shape)
-            # print('turn', self.turn, type(self.turn))
-            # print('rolled', self.rolled, type(self.rolled))
             moves_array = legal_moves_array(self.board, self.turn, self.rolled)
-            # print('but here only once?')
-            # print(moves_array)
             moves = np.where(moves_array)[0].tolist()
         return moves if moves else ['pass']
 
+    # Not used as moves are played by selecting from legal_moves
     def is_legal_move(self, move):
         # 0. a pass is only legal if there are no other moves
         if move == 'pass':
@@ -282,57 +177,18 @@ class Ur:
         # otherwise it's legal
         return True
 
-    # def play_move(self, move, checks=True):
-    #     # move is the square whose stone to move
-    #     if checks:
-    #         if self.winner != -1:
-    #             print('game already finished.')
-    #             return
-    #
-    #         if not self.is_legal_move(move):
-    #             # lose game
-    #             self.winner = self.other
-    #             return
-    #
-    #     self.move_count += 1
-    #
-    #     if move == 'pass':
-    #         self.change_turn()
-    #         self.roll()
-    #         return
-    #
-    #     end = move + self.rolled
-    #     self.board[self.turn, move] -= 1
-    #     self.board[self.turn, end] += 1
-    #     #
-    #     # if end not in self.rosettes:
-    #     #     # captures
-    #     #     if self.board[self.other, end] and self.safety_length_start < end < self.finish - self.safety_length_end:
-    #     #         self.board[self.other, end] = 0
-    #     #         self.board[self.other, self.start] += 1
-    #     #
-    #     #     # finished
-    #     #     if self.board[self.turn, self.finish] == self.n_pieces:
-    #     #         self.winner = self.turn
-    #     #     else:
-    #     #
-    #
-    #     # captures
-    #     if (self.board[self.other, end] == 1 and  # opponent stone present
-    #             self.safety_length_start < end < self.finish - self.safety_length_end):  # and in capturable zone
-    #         self.board[self.other, end] = 0
-    #         self.board[self.other, self.start] += 1
-    #
-    #     # check if the game is finished
-    #     if self.board[self.turn, self.finish] == self.n_pieces:
-    #         self.winner = self.turn
-    #     else:
-    #         if end not in self.rosettes:
-    #             self.change_turn()
-    #         self.roll()
-
     def play_move(self, move, checks=False):
         self.move_count += 1
+
+        # if checks:
+        #     if self.winner != -1:
+        #         print('game already finished.')
+        #         return
+        #
+        #     if not self.is_legal_move(move):
+        #         # lose game
+        #         self.winner = self.other
+        #         return
 
         if move == 'pass':
             self.change_turn()
@@ -345,12 +201,9 @@ class Ur:
             if winner:
                 self.winner = self.turn
             else:
-                self.turn = int(new_turn) # need to convert from DeviceArray
-                self.other = (int(new_turn) + 1) % 2
+                self.turn = int(new_turn)  # need to convert from DeviceArray
+                self.other = (self.turn + 1) % 2
                 self.roll()
-
-    def other(self):
-        return self.other #(self.turn + 1) % 2
 
     def change_turn(self):
         self.turn, self.other = self.other, self.turn
@@ -391,8 +244,6 @@ class Ur:
         boards, _, _ = get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
         return boards
 
-    def simulate_move_jax(self, move, checks=True):
-        return 0, sim_move(self.board, move, move + self.rolled, self.turn)
 
     # testing
     def check_valid_board(self):
