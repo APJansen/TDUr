@@ -290,7 +290,7 @@ class Ur:
     def display(self):
         board_display = self.reshape_board()
 
-        cmap = colors.ListedColormap(['b', 'gray', 'r', 'w'])
+        cmap = colors.ListedColormap(['b', 'w', 'r', 'y'])
 
         plt.imshow(board_display, cmap=cmap, extent=(0, self.display_width, 3, 0), vmin=-1, vmax=3)
         self.annotate_board()
@@ -323,11 +323,11 @@ class Ur:
 
         # rosettes
         for (y, x) in [(0, 0), (2, 0), (1, 3), (0, 6), (2, 6)]:
-            plt.text(t_x + x - 4 - .08, t_y + y + .2, 'X', fontsize=48, color='black')
+            plt.text(t_x + x - 4 - .12, t_y + y + .28, 'X', fontsize=54, color='black')
 
         # make it pretty
         ax = plt.gca()
-        ax.set_xticks(np.arange(0, self.display_width, 1))
-        ax.set_yticks(np.arange(0, 3, 1))
-        ax.grid(color='black', linewidth=2)
-        ax.tick_params(labelbottom=False, labelleft=False)
+        ax.set_xticks(np.arange(0, self.display_width + 1, 1))
+        ax.set_yticks(np.arange(0, 3 + 1, 1))
+        ax.grid(color='black', linewidth=5, fillstyle='full')
+        ax.tick_params(labelbottom=False, labelleft=False, color='w')

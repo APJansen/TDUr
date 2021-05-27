@@ -28,7 +28,8 @@ def get_TD_error(new_value, value, reward, winner, discount):
         return reward - value
 
 
-def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100, save=False):
+def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100, save=False,
+          learning_rate_decay=1):
     outcomes = np.zeros(shape=episodes + 1, dtype='int8')
     start = time.time()
     total_moves = 0
@@ -61,6 +62,8 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
                 finished = True
                 outcomes[episode] = game.winner
                 total_moves += game.move_count
+
+        learning_rate *= learning_rate_decay
 
         if episode % iprint == 0 and episode > 0:
             end = time.time()
