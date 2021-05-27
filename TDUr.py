@@ -89,8 +89,8 @@ class TDUr:
 
     def policy(self, game, epsilon=0):
         moves = game.legal_moves()
-        if moves == ['pass']:
-            return 'pass'
+        if len(moves) == 1:
+            return moves[0]
 
         if np.random.uniform() < epsilon:
             return np.random.choice(moves)
