@@ -241,8 +241,8 @@ class Ur:
         return reward, board
 
     def simulate_moves(self, moves):
-        boards, _, _ = get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
-        return boards
+        boards, turns, _ = get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
+        return boards, turns
 
 
     # testing

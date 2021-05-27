@@ -13,10 +13,10 @@ import pickle
 # this way what's returned is still always the value from player 0's perspective.
 # this should enforce a 50/50 win rate in self play (up to starting player's advantage)
 @jit
-def compute_value(params, board):
+def compute_value(params, board, turn):
     # make it so that it always analyzes boards where it's player 0's turn
-    zero, one = board[:, -1]
-    board = np.flip(board[board[:, -1]], axis=0)
+    other = (turn + 1) % 2
+    board = jnp.array([board[turn], board[other]])
 
     activations = jnp.reshape(board, -1)
     for w, b in params[:-1]:
@@ -27,11 +27,11 @@ def compute_value(params, board):
     logit = jnp.reshape(jnp.dot(final_w, activations) + final_b, (()))
     value = sigmoid(logit)
 
-    return zero * value + one * (1 - value)
+    return other * value + turn * (1 - value)
 
 
 value_grad = jit(grad(compute_value))
-compute_values = jit(vmap(compute_value, in_axes=(None, 0)))
+compute_values = jit(vmap(compute_value, in_axes=(None, 0, 0)))
 
 
 @jit
@@ -62,12 +62,15 @@ class TDUr:
         self.key = key
         self.params = init_network_params([self.input_units, self.hidden_units, 1], key)
 
-    def value(self, board):
-        # computes value as seen from player 0
-        return compute_value(self.params, board)
+    def value(self, board, turn):
+        """
+        Computes value as seen from player 0.
+        Input: board, turn
+        """
+        return compute_value(self.params, board, turn)
 
-    def value_gradient(self, board):
-        return value_grad(self.params, board)
+    def value_gradient(self, board, turn):
+        return value_grad(self.params, board, turn)
 
     def get_params(self):
         return self.params
@@ -84,18 +87,16 @@ class TDUr:
     def update_params(self, scalar, eligibility):
         self.params = get_new_params(self.params, scalar, eligibility)
 
-    def policy(self, game, epsilon=0, checks=False):
+    def policy(self, game, epsilon=0):
         moves = game.legal_moves()
         if moves == ['pass']:
             return 'pass'
 
-        if np.random.uniform() < epsilon:  # TODO: replace with jax's random?
+        if np.random.uniform() < epsilon:
             return np.random.choice(moves)
 
-        boards = game.simulate_moves(moves)
-        values = compute_values(self.params, boards)
+        boards, turns = game.simulate_moves(moves)
+        values = compute_values(self.params, boards, turns)
 
         chosen_move = moves[min_max_move(values, game.turn)]
         return chosen_move
-
-    pickle.load
