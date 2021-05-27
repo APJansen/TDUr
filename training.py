@@ -28,13 +28,27 @@ def get_TD_error(new_value, value, reward, winner, discount):
         return reward - value
 
 
+def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay):
+    name = f'N{agent.hidden_units:d}'
+    name += f'-alpha{learning_rate:.3f}'
+    name += f'-lambda{lmbda:.2f}'
+    name += f'-epsilon{epsilon:.5f}'
+    name += f'-dalpha{lr_decay:.6f}'
+    return name
+
+
 def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100, save=False,
-          learning_rate_decay=1):
-    outcomes = np.zeros(shape=episodes + 1, dtype='int8')
+          learning_rate_decay=1, episode_start=0, custom_name=False):
+    red_wins = 0
     start = time.time()
     total_moves = 0
 
-    for episode in range(episodes + 1):
+    if custom_name:
+        name = custom_name
+    else:
+        name = compose_name(agent, learning_rate, epsilon, lmbda, learning_rate_decay)
+
+    for episode in range(episode_start, episode_start + episodes + 1):
         game.reset()
         finished = False
         eligibility = init_eligibility([agent.input_units, agent.hidden_units, 1])
@@ -60,23 +74,21 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
 
             if game.winner != -1:
                 finished = True
-                outcomes[episode] = game.winner
+                red_wins += 1 - game.winner
                 total_moves += game.move_count
 
         learning_rate *= learning_rate_decay
 
-        if episode % iprint == 0 and episode > 0:
+        if episode % iprint == 0 and episode > episode_start:
             end = time.time()
-            wins_1 = np.sum(outcomes[episode - iprint:episode])
-            print(f'episodes: {episode}; wins: {iprint - wins_1:d}-{wins_1:d}; time: '
+            print(f'episodes: {episode}; red wins: {red_wins:d}; time: '
                   f'{(end - start) / total_moves * 1000:.2f} s/(1k moves) ({end-start:.1f}s tot); '
                   f'{total_moves/iprint:.0f} moves per game.')
             start = end
             total_moves = 0
+            red_wins = 0
             if save:
-                agent.save_params(save + f'-episodes{episode:d}')
-
-    return outcomes
+                agent.save_params(name + f'-episodes{episode:d}')
 
 
 # The 2 functions below were just to test everything before adding complications of self play.
@@ -146,9 +158,6 @@ def train_vs_previous_self(agent, agent_previous, game, episodes, learning_rate,
                     game.play_move(agent_previous.policy(game, epsilon))
 
                 reward = game.reward()
-                # if reward != 0:
-                #     print(f'agent sees reward {reward}!, board:')
-                #     print(game.board)
                 new_value = agent.value(game.board, game.turn)
                 TD_error = reward + discount * new_value - value
 

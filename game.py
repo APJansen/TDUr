@@ -47,8 +47,6 @@ def get_new_board(board, move, rolled, turn):
     # change turn, unless ending on a rosette
     other = (turn + 1) % 2
     new_turn = (turn + 1 + rosette_board[end]) % 2
-    indices_x, indices_y = indices_x + [turn, other], indices_y + [-1, -1]
-    values = values + [0 + rosette_board[end], 1 - rosette_board[end]]
 
     # capture, if opponent present and in capturable area
     start = 0
@@ -57,9 +55,8 @@ def get_new_board(board, move, rolled, turn):
                        board[other, start] + capture_board[end] * board[other, end]]
 
     board_new = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
-    finish, n_pieces = 15, 7
-    winner = board_new[turn, finish] == n_pieces
-    return board_new, new_turn, winner
+
+    return board_new, new_turn
 
 
 get_new_boards = jit(vmap(get_new_board, in_axes=(None, 0, None, None)))
@@ -92,7 +89,6 @@ class Ur:
         # board
         self.start = 0
         self.finish = 15
-        self.turn_index = 16
         self.rosettes = [4, 8, 14]
         self.safe_square = 8
         self.safety_length_end = 2 if mode == 'classic' else 0
@@ -116,11 +112,10 @@ class Ur:
         self.turn = 0
         self.other = 1
         self.winner = -1
-        self.board = np.zeros(shape=(2, self.finish + 2), dtype=np.int8)
+        self.board = np.zeros(shape=(2, self.finish + 1), dtype=np.int8)
         self.board[0, self.start] = self.n_pieces
         self.board[1, self.start] = self.n_pieces
-        self.board[self.turn, self.turn_index] = 1
-        self.board[self.other, self.turn_index] = 0
+
         self.move_count = 0
         self.roll()
 
@@ -179,7 +174,7 @@ class Ur:
 
     def play_move(self, move, checks=False):
         self.move_count += 1
-
+        turn_played = self.turn
         # if checks:
         #     if self.winner != -1:
         #         print('game already finished.')
@@ -194,11 +189,11 @@ class Ur:
             self.change_turn()
             self.roll()
         else:
-            new_board, new_turn, winner = get_new_board(self.board, move, self.rolled, self.turn)
+            new_board, new_turn = get_new_board(self.board, move, self.rolled, self.turn)
 
             self.board = np.array(new_board)
 
-            if winner:
+            if self.board[turn_played, self.finish] == self.n_pieces:
                 self.winner = self.turn
             else:
                 self.turn = int(new_turn)  # need to convert from DeviceArray
@@ -207,8 +202,6 @@ class Ur:
 
     def change_turn(self):
         self.turn, self.other = self.other, self.turn
-        self.board[self.turn, self.turn_index] = 1
-        self.board[self.other, self.turn_index] = 0
 
     def reward(self):
         if self.winner == -1:
@@ -241,9 +234,7 @@ class Ur:
         return reward, board
 
     def simulate_moves(self, moves):
-        boards, turns, _ = get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
-        return boards, turns
-
+        return get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
 
     # testing
     def check_valid_board(self):
@@ -270,11 +261,7 @@ class Ur:
         if not (0 <= board[1, self.finish] <= self.n_pieces):
             return 'illegal start pieces (player 1)'
 
-        turn_info = board[:, self.turn_index]
-        if not (min(turn_info) == 0 and max(turn_info) == 1):
-            return 'illegal roll/turn'
-
-        overlap_board = board[:, self.safety_length_start + 1: -self.safety_length_end - 2]
+        overlap_board = board[:, self.safety_length_start + 1: -self.safety_length_end - 1]
         if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.finish - self.safety_length_start
                                                            - self.safety_length_end - 1, dtype='int8')).all():
             return 'overlapping stones'
@@ -297,14 +284,14 @@ class Ur:
 
     def reshape_board(self):
         reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
-        reshaped_board[1] = (self.board[0, self.safety_length_start + 1:-self.safety_length_end - 2] -
-                             self.board[1, self.safety_length_start + 1:-self.safety_length_end - 2])
+        reshaped_board[1] = (self.board[0, self.safety_length_start + 1:-self.safety_length_end - 1] -
+                             self.board[1, self.safety_length_start + 1:-self.safety_length_end - 1])
         for player in [0, 1]:
             sign = (1 - 2 * player)
             reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self.safety_length_start + 1])
             if self.safety_length_end:
                 reshaped_board[2 * player, -self.safety_length_end:] = sign * np.flip(
-                    self.board[player, -self.safety_length_end - 2:-2])
+                    self.board[player, -self.safety_length_end - 1:-1])
         return reshaped_board
 
     def annotate_board(self):

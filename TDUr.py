@@ -57,7 +57,7 @@ def init_network_params(sizes, key):
 class TDUr:
 
     def __init__(self, hidden_units=40, key=random.PRNGKey(42)):
-        self.input_units = 34
+        self.input_units = 32
         self.hidden_units = hidden_units
         self.key = key
         self.params = init_network_params([self.input_units, self.hidden_units, 1], key)
