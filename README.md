@@ -2,6 +2,7 @@
 [The Royal Game of Ur](#game)  
 - [Video Introduction by Irving Finkel](#vid)
 - [Rules](#rules)
+- [Play Game!](#play)
 - [Strategy](#strat)
 
 [TD-Ur](#tdur)
@@ -11,6 +12,7 @@
 - [TD Learning](#td)
 - [TD(lambda)](#eligibility)
 - [Search](#srch)
+- [Self-Play](#selfplay)
 - [Implementation Details](#details)
 
 <a name="game"/>
@@ -60,6 +62,15 @@ When moving to a square occupied by the opponent, the opponent's stone is captur
 When moving to a rosette square, the player gets another turn. Otherwise the turn transfers to the opponent.
 
 Finally, when a player has no legal moves, or a 0 is thrown, they must pass. Passing is only allowed when there are no legal moves.
+
+<a name="play"/>
+
+## Play Game!
+The easiest way to play the game against TD-Ur is to go to this link. __TODO: add link once it's public, changing the imports from drive to online__
+This will run the code remotely (in a Colab notebook), which means you don't need to install anything, but also that there is a slight delay after making a move.
+
+If you are familiar with Python you can download this repository and run the Jupyter notebook play_game.ipynb.
+The dependencies are jax, numpy, matplotlib and ipywidgets.
 
 
 <a name="strat"/>
@@ -123,7 +134,7 @@ This often involves having the agent learn a _value function_, an estimate of th
 This value function can be allowed to depend only on the current state, or also on the chosen action, when it's called an action value.
 For games such as this where the transition to a new state can be decomposed into first a deterministic part and then a probabilistic part, it is convenient to choose a middle ground, namely the afterstate. So the input to our value function will be the board configuration and whose turn it is, but it does not include the dice roll, and it's not necessarily the agent's turn.
 
-Given such an afterstate s_a obtained from the deterministic part of the transition after taking action a in state s, we want to learn to estimate a number  0 <= v(s_a) <= 1 representing the probability of winning the game.
+Given such an afterstate s_a obtained from the deterministic part of the transition after taking action a in state s, we want to learn to estimate a number  0 <= v(s_a) <= 1 ![equation](https://latex.codecogs.com/svg.latex?0%20%5Cleq%20v%28s_a%29%20%5Cleq%201%7B%5Ccolor%7BDarkOrange%7D%20%7D) representing the probability of winning the game.
 We will use a neural network to represent this function. A simple fully connected network with one hidden layer will do. Using a sigmoid activation function on the final layer guarantees that the value will be between 0 and 1.
 Initializing the weights as random small numbers, our initial estimate will have values near 0.5, with no structure or meaning to it.
 
@@ -175,10 +186,18 @@ When lambda=0 we recover the previous 1-step TD, but often, and indeed in our ca
 
 TODO: implement and explain search
 
+<a name="selfplay"/>
+
+## Self-Play
+
+TODO
+
 <a name="details"/>
 
 ## Implementation Details
 Finally we discuss a few implementation details.
+
+### Board Representation
 
 For the board itself, internally a different representation is used, where the board is unrolled so that movement is always from left to right, 
 and the middle row is duplicated, with stones always staying on their own side. 
@@ -196,6 +215,8 @@ This allows us to use a heuristic to set the learning rate, inspired by linear a
 We furthermore flip the board if necessary so that the neural network always gets fed boards where it's the red player's turn.
 To always output the value function as seen from the red player's point of view, which seems the most stable, we output 1 - value if it was actually the blue player's turn.
 
+### Jax
+
 To speed up the training, we made heavy use of jax, which has sped it up by a factor of 100, allowing play of about 1000 moves per second on a CPU.
 This involves adding `jit` decorators around often used functions, which automatically compiles them the first time they're run.
 It is actually a bit more involved, but only slightly. 
@@ -205,5 +226,10 @@ So to use jax to its full extent, these conditionals should be converted as much
 We have also used `grad` to compute the derivative of the value function in a single line, and `vmap` to compute the values of all legal moves in one batch, 
 without having to explicitly add the batch dimension in the code.
 
+### TD error
+
 Finally, for the final TD error, when a game is finished, we use the reward minus the previous value, rather than the reward plus the next value minus the previous value. This is because we know the total return of the final state exactly, it is simply one if we have won and zero otherwise, so there is no need to bootstrap.
+
+### Hyperparameters
+State which used for the best agent, a little bit about how searched for.
 
