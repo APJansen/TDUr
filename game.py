@@ -7,22 +7,28 @@ from jax.ops import index, index_update
 from functools import partial
 
 
+BOARD_ROSETTES = [4, 8, 14]
+BOARD_WIDTH_INTERNAL = 16
+BOARD_MID_START = 5
+BOARD_MID_END = 12
+BOARD_START = 0
+BOARD_FINISH = 15
+BOARD_SAFE_SQUARE = 8
+
+
 @partial(jit, static_argnums=(1, 2))
 def legal_moves_array(board, turn, rolled):
-    finish = 15
-    safe_square = 8
-
     # start square contains a stone to move, and won't move it beyond the finish
-    moves_with_legal_start = board[turn, 0:finish + 1 - rolled] > 0
+    moves_with_legal_start = board[turn, 0:BOARD_FINISH + 1 - rolled] > 0
 
     # end square is within range and does not contain player stone (or is finish)
-    moves_with_legal_end = board[turn, rolled: finish + 1] == 0
+    moves_with_legal_end = board[turn, rolled: BOARD_FINISH + 1] == 0
     moves_with_legal_end = index_update(moves_with_legal_end, index[-1], True)
 
     # it's not a capture on the safe space
-    safe_space = jnp.zeros(finish + 1 - rolled, dtype='bool')
-    safe_space = index_update(safe_space, index[safe_square - rolled], True)
-    opponent_present = board[(turn + 1) % 2, rolled: finish + 1] > 0
+    safe_space = jnp.zeros(BOARD_FINISH + 1 - rolled, dtype='bool')
+    safe_space = index_update(safe_space, index[BOARD_SAFE_SQUARE - rolled], True)
+    opponent_present = board[(turn + 1) % 2, rolled: BOARD_FINISH + 1] > 0
     no_illegal_capture = ~(opponent_present & safe_space)
 
     legal_moves = moves_with_legal_start & moves_with_legal_end & no_illegal_capture
@@ -37,22 +43,20 @@ def get_new_board(board, move, rolled, turn):
     indices_x, indices_y, values = [turn, turn], [move, end], [board[turn, move] - 1, board[turn, end] + 1]
 
     # construct auxiliary boards to help with logic
-    rosettes = [4, 8, 14]
-    rosette_board = jnp.zeros(shape=17, dtype='int8')
-    for i in rosettes:
+    rosette_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
+    for i in BOARD_ROSETTES:
         rosette_board = index_update(rosette_board, i, 1)
-    capture_board = jnp.zeros(shape=17, dtype='int8')
-    capture_board = index_update(capture_board, (index[5:13]), 1)
+    capture_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
+    capture_board = index_update(capture_board, (index[BOARD_MID_START:BOARD_MID_END+1]), 1)
 
     # change turn, unless ending on a rosette
     other = (turn + 1) % 2
     new_turn = (turn + 1 + rosette_board[end]) % 2
 
     # capture, if opponent present and in capturable area
-    start = 0
-    indices_x, indices_y = indices_x + [other, other], indices_y + [end, start]
+    indices_x, indices_y = indices_x + [other, other], indices_y + [end, BOARD_START]
     values = values + [(1 - capture_board[end]) * board[other, end],
-                       board[other, start] + capture_board[end] * board[other, end]]
+                       board[other, BOARD_START] + capture_board[end] * board[other, end]]
 
     board_new = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
 
@@ -85,14 +89,14 @@ class Ur:
     where t = 0 for the player whose turn it is not, and 1 for the other.
     """
 
-    def __init__(self, mode='classic'):
+    def __init__(self):
         # board
-        self.start = 0
-        self.finish = 15
-        self.rosettes = [4, 8, 14]
-        self.safe_square = 8
-        self.safety_length_end = 2 if mode == 'classic' else 0
-        self.safety_length_start = 4
+        self.start = BOARD_START
+        self.finish = BOARD_FINISH
+        self.rosettes = BOARD_ROSETTES
+        self.safe_square = BOARD_SAFE_SQUARE
+        self.mid_start = BOARD_MID_START
+        self.mid_end = BOARD_MID_END
 
         # piece
         self.n_pieces = 7
@@ -102,7 +106,7 @@ class Ur:
         self.die_faces = 2
 
         # display
-        self.display_width = 8 if mode == 'classic' else 10
+        self.display_width = 8
 
         # state
         self.rolled = self.turn = self.other = self.winner = self.board = self.move_count = self.backup_data = None
@@ -172,18 +176,9 @@ class Ur:
         # otherwise it's legal
         return True
 
-    def play_move(self, move, checks=False):
+    def play_move(self, move):
         self.move_count += 1
         turn_played = self.turn
-        # if checks:
-        #     if self.winner != -1:
-        #         print('game already finished.')
-        #         return
-        #
-        #     if not self.is_legal_move(move):
-        #         # lose game
-        #         self.winner = self.other
-        #         return
 
         if move == 'pass':
             self.change_turn()
@@ -227,7 +222,7 @@ class Ur:
 
     def simulate_move(self, move, checks=True):
         self.backup()
-        self.play_move(move, checks)
+        self.play_move(move)
         reward = self.reward()
         board = self.board.copy()
         self.restore_backup()
@@ -261,9 +256,9 @@ class Ur:
         if not (0 <= board[1, self.finish] <= self.n_pieces):
             return 'illegal start pieces (player 1)'
 
-        overlap_board = board[:, self.safety_length_start + 1: -self.safety_length_end - 1]
-        if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.finish - self.safety_length_start
-                                                           - self.safety_length_end - 1, dtype='int8')).all():
+        overlap_board = board[:, self.mid_start:self.mid_end + 1]
+        if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.mid_end + 1 - self.mid_start
+                                                           , dtype='int8')).all():
             return 'overlapping stones'
 
         if self.winner != -1:
@@ -284,14 +279,13 @@ class Ur:
 
     def reshape_board(self):
         reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
-        reshaped_board[1] = (self.board[0, self.safety_length_start + 1:-self.safety_length_end - 1] -
-                             self.board[1, self.safety_length_start + 1:-self.safety_length_end - 1])
+        reshaped_board[1] = (self.board[0, self.mid_start:self.mid_end + 1] -
+                             self.board[1, self.mid_end:self.mid_end + 1])
         for player in [0, 1]:
             sign = (1 - 2 * player)
-            reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self.safety_length_start + 1])
-            if self.safety_length_end:
-                reshaped_board[2 * player, -self.safety_length_end:] = sign * np.flip(
-                    self.board[player, -self.safety_length_end - 1:-1])
+            reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self.mid_start])
+            reshaped_board[2 * player, -(self.finish - (self.mid_end + 1)):] = sign * np.flip(
+                self.board[player, self.mid_end + 1:-1])
         return reshaped_board
 
     def annotate_board(self):
@@ -300,7 +294,7 @@ class Ur:
         stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]
         player_colors = ['r', 'r', 'b', 'b']
         x_start = 4
-        x_finish = self.display_width - self.safety_length_end - 1
+        x_finish = self.display_width - (self.finish - self.mid_end)
         positions = [(x_start, 0), (x_finish, 0), (x_start, 2), (x_finish, 2)]
         for s, c, (x, y) in zip(stats, player_colors, positions):
             plt.text(x + .3, y + .7, f'{s}', fontsize=24, color=c)
