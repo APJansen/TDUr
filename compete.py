@@ -21,14 +21,14 @@ def compete_policies(game, pi_1, pi_2, episodes=1_000):
             scores[1] += 1
 
     return scores
-
-
-def payoff_matrix(game, policies, episodes=1_000):
-    n_policies = len(policies)
-    payoffs = np.zeros(shape=(n_policies, n_policies))
-    for i, pi_1 in enumerate(policies):
-        for j, pi_2 in enumerate(policies):
-            if j > i:
-                scores = compete_policies(game, pi_1, pi_2, episodes=episodes)[0]
-                payoffs[i, j] = scores[0] / episodes
-    return payoffs
+#
+#
+# def payoff_matrix(game, policies, episodes=1_000):
+#     n_policies = len(policies)
+#     payoffs = np.zeros(shape=(n_policies, n_policies))
+#     for i, pi_1 in enumerate(policies):
+#         for j, pi_2 in enumerate(policies):
+#             if j > i:
+#                 scores = compete_policies(game, pi_1, pi_2, episodes=episodes)[0]
+#                 payoffs[i, j] = scores[0] / episodes
+#     return payoffs
