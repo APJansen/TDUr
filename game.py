@@ -10,7 +10,7 @@ from functools import partial
 BOARD_ROSETTES = [4, 8, 14]
 BOARD_WIDTH_INTERNAL = 16
 BOARD_MID_START = 5
-BOARD_MID_END = 12
+BOARD_MID_ENDED = 13
 BOARD_START = 0
 BOARD_FINISH = 15
 BOARD_SAFE_SQUARE = 8
@@ -47,7 +47,7 @@ def get_new_board(board, move, rolled, turn):
     for i in BOARD_ROSETTES:
         rosette_board = index_update(rosette_board, i, 1)
     capture_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
-    capture_board = index_update(capture_board, (index[BOARD_MID_START:BOARD_MID_END+1]), 1)
+    capture_board = index_update(capture_board, (index[BOARD_MID_START:BOARD_MID_ENDED]), 1)
 
     # change turn, unless ending on a rosette
     other = (turn + 1) % 2
@@ -96,7 +96,7 @@ class Ur:
         self.rosettes = BOARD_ROSETTES
         self.safe_square = BOARD_SAFE_SQUARE
         self.mid_start = BOARD_MID_START
-        self.mid_end = BOARD_MID_END
+        self.mid_ended = BOARD_MID_ENDED
 
         # piece
         self.n_pieces = 7
@@ -256,9 +256,8 @@ class Ur:
         if not (0 <= board[1, self.finish] <= self.n_pieces):
             return 'illegal start pieces (player 1)'
 
-        overlap_board = board[:, self.mid_start:self.mid_end + 1]
-        if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.mid_end + 1 - self.mid_start
-                                                           , dtype='int8')).all():
+        overlap_board = board[:, self.mid_start:self.mid_ended]
+        if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.mid_ended - self.mid_start, dtype='int8')).all():
             return 'overlapping stones'
 
         if self.winner != -1:
@@ -279,13 +278,13 @@ class Ur:
 
     def reshape_board(self):
         reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
-        reshaped_board[1] = (self.board[0, self.mid_start:self.mid_end + 1] -
-                             self.board[1, self.mid_end:self.mid_end + 1])
+        reshaped_board[1] = (self.board[0, self.mid_start:self.mid_ended] -
+                             self.board[1, self.mid_start:self.mid_ended])
         for player in [0, 1]:
             sign = (1 - 2 * player)
             reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self.mid_start])
-            reshaped_board[2 * player, -(self.finish - (self.mid_end + 1)):] = sign * np.flip(
-                self.board[player, self.mid_end + 1:-1])
+            reshaped_board[2 * player, -(self.finish - self.mid_ended):] = sign * np.flip(
+                self.board[player, self.mid_ended:-1])
         return reshaped_board
 
     def annotate_board(self):
@@ -294,7 +293,7 @@ class Ur:
         stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]
         player_colors = ['r', 'r', 'b', 'b']
         x_start = 4
-        x_finish = self.display_width - (self.finish - self.mid_end)
+        x_finish = self.display_width - (self.finish + 1 - self.mid_ended)
         positions = [(x_start, 0), (x_finish, 0), (x_start, 2), (x_finish, 2)]
         for s, c, (x, y) in zip(stats, player_colors, positions):
             plt.text(x + .3, y + .7, f'{s}', fontsize=24, color=c)
