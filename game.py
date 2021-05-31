@@ -199,13 +199,16 @@ class Ur:
         self.turn, self.other = self.other, self.turn
 
     def reward(self):
-        if self.winner == -1:
+        if not self.has_finished():
             return 0
         elif self.winner == 0:
             # note if there's a winner the turn no longer changes
             return 1
         else:
             return 0
+
+    def has_finished(self):
+        return self.winner != -1
 
     # to allow n-step methods and planning
     def get_state(self):

@@ -70,7 +70,7 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
             agent.update_params(learning_rate * TD_error, eligibility)
 
-            if game.winner != -1:
+            if game.has_finished():
                 finished = True
                 red_wins += 1 - game.winner
                 total_moves += game.move_count

@@ -95,7 +95,7 @@ class InteractiveGame:
         self.label_grid = self.create_label_grid()
         self.game_interface = self.create_interface()
 
-    def create_interactive_board(self, grid_height=3, grid_width=11, finish=5):
+    def create_interactive_board(self, grid_height=3, grid_width=11):
         game = self.game
         board_width = self.board_width
 
@@ -109,8 +109,9 @@ class InteractiveGame:
                 grid[h_display, w_display] = self.play_move_button(h_display, w_display)
 
         # add stone count on start and finish squares
+        w_display_start, w_display_finish = 4, 5
         for i in [0, 2]:
-            for j in [4, 5]:
+            for j in [w_display_start, w_display_finish]:
                 grid[i, j].description = f'{game.board[self.transform_to_internal(i, j)]}'
                 grid[i, j].style = {'button_color': color_yellow, 'font_size': '20'}
                 if i == 0:
@@ -120,7 +121,7 @@ class InteractiveGame:
 
         # disable those on the finish
         for i in [0, 2]:
-            grid[i, finish]._click_handlers.callbacks = []
+            grid[i, w_display_finish]._click_handlers.callbacks = []
 
         # add rosettes
         for i in [0, 1]:
@@ -198,7 +199,7 @@ class InteractiveGame:
     def play_agent(self, button):
         if self.game.turn == self.human:
             self.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
-        else:
+        elif not self.game.has_finished():
             move = self.agent.policy(self.game)
             self.play_and_update(move)
 
@@ -211,16 +212,16 @@ class InteractiveGame:
         else:
             turn = game.turn
             rolled = game.rolled
-            _, w_disp_before = self.transform_to_display(turn, move)
-            _, w_disp = self.transform_to_display(turn, move + rolled)
+            _, w_display_before = self.transform_to_display(turn, move)
+            _, w_display = self.transform_to_display(turn, move + rolled)
             game.play_move(move)
 
-            for h_disp in range(3):
-                self.update_board_square(h_disp, w_disp, turn)
-                self.update_board_square(h_disp, w_disp_before, turn)
+            for h_display in range(3):
+                self.update_board_square(h_display, w_display, turn)
+                self.update_board_square(h_display, w_display_before, turn)
             self.update_starts()
 
-            if game.winner != -1:
+            if game.has_finished():
                 self.update_scores()
                 self.print_result()
 
@@ -237,17 +238,18 @@ class InteractiveGame:
         self.grid[2 * self.game.turn, 8].description = f'{self.game.rolled}'
 
     def update_starts(self):
-        for h_disp in [0, 2]:
-            self.update_board_square(h_disp, 4, 0)
+        for h_display in [0, 2]:
+            self.update_board_square(h_display, 4, 0)
 
     def update_players(self):
         human = self.human
         ai = (human + 1) % 2
+        w_player = self.game.display_width + 1
 
-        self.grid[2 * human, self.board_width + 1:] = self.make_button('You', color_yellow, css_style="red_font_small",
-                                                                       action=self.play_pass)
-        self.grid[2 * ai, self.board_width + 1:] = self.make_button('TD-Ur', color_yellow, css_style="blue_font_small",
-                                                                    action=self.play_agent)
+        self.grid[2 * human, w_player:] = self.make_button('You', color_yellow, action=self.play_pass)
+        self.grid[2 * ai, w_player:] = self.make_button('TD-Ur', color_yellow, action=self.play_agent)
+        self.grid[0, w_player:].add_class("red_font_small")
+        self.grid[2, w_player:].add_class("blue_font_small")
 
     def update_board_square(self, h_display, w_display, turn):
         """Updates button color/number, after the internal board has been updated, but with the turn argument
@@ -266,7 +268,7 @@ class InteractiveGame:
 
         # for squares on the board, update color
         else:
-            if 5 <= w <= 12:
+            if self.game.mid_start <= w < self.game.mid_ended:
                 if game.board[0, w]:
                     color = color_red
                 elif game.board[1, w]:
@@ -299,11 +301,15 @@ class InteractiveGame:
         if game.turn != self.human:
             is_legal = False
             self.display_error("It's TD-Ur's turn!", "Click its name to let it make a move.")
+        if game.has_finished():
+            is_legal = False
+            self.display_error("The game has finished!", "Click New Game to start a new one.")
+
         elif move not in game.legal_moves():
             is_legal = False
             if game.board[game.turn, move] == 0:
                 reason = "No stone present to move."
-            elif move + game.rolled > 15:
+            elif move + game.rolled > self.game.finish:
                 reason = "This would move the stone off the board."
             elif game.board[game.turn, move + game.rolled] == 1:
                 reason = "Your own stone is in the way."
@@ -344,20 +350,19 @@ class InteractiveGame:
         self.update_players()
         self.remove_error()
         for i in range(3):
-            for j in range(8):
+            for j in range(self.game.display_width):
                 self.update_board_square(i, j, 0)
 
-    @staticmethod
-    def transform_to_display(i, j):
+    def transform_to_display(self, i, j):
         """Go from internal board representation coordinates (2x16) to displayed board (3x8) coordinates"""
-        if j <= 4:
-            j_display = 4 - j
+        if j < self.game.mid_start:
+            j_display = self.game.mid_start - 1 - j
             i_display = 2 * i
-        elif j >= 13:
-            j_display = 7 - (j - 13)
+        elif j >= self.game.mid_ended:
+            j_display = (self.game.display_width - 1) - (j - self.game.mid_ended)
             i_display = 2 * i
         else:
-            j_display = j - 5
+            j_display = j - self.game.mid_start
             i_display = 1
 
         return i_display, j_display
@@ -366,13 +371,13 @@ class InteractiveGame:
         """Go from to displayed board (3x8) coordinates to internal board representation coordinates (2x16)"""
         if i == 1:  # middle row
             i_internal = self.game.turn
-            j_internal = j + 5
+            j_internal = j + self.game.mid_start
         else:
             i_internal = i // 2
-            if j <= 4:
-                j_internal = 4 - j
+            if j < self.game.mid_start:
+                j_internal = self.game.mid_start - 1 - j
             else:
-                j_internal = 13 - (j - 7)
+                j_internal = self.game.mid_ended - (j - (self.game.display_width - 1))
 
         return i_internal, j_internal
 
