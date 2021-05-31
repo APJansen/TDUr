@@ -197,9 +197,11 @@ class InteractiveGame:
             self.display_error("You shall not pass!", "You have a legal move")
 
     def play_agent(self, button):
-        if self.game.turn == self.human:
+        if self.game.has_finished():
+            self.display_error("The game has finished!", "Click New Game to start a new one.")
+        elif self.game.turn == self.human:
             self.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
-        elif not self.game.has_finished():
+        else:
             move = self.agent.policy(self.game)
             self.play_and_update(move)
 
@@ -298,13 +300,12 @@ class InteractiveGame:
         game = self.game
         is_legal = True
 
-        if game.turn != self.human:
-            is_legal = False
-            self.display_error("It's TD-Ur's turn!", "Click its name to let it make a move.")
         if game.has_finished():
             is_legal = False
             self.display_error("The game has finished!", "Click New Game to start a new one.")
-
+        elif game.turn != self.human:
+            is_legal = False
+            self.display_error("It's TD-Ur's turn!", "Click its name to let it make a move.")
         elif move not in game.legal_moves():
             is_legal = False
             if game.board[game.turn, move] == 0:
@@ -313,7 +314,7 @@ class InteractiveGame:
                 reason = "This would move the stone off the board."
             elif game.board[game.turn, move + game.rolled] == 1:
                 reason = "Your own stone is in the way."
-            elif game.board[game.other, move + game.rolled] == 1 and move + game.rolled == 8:
+            elif game.board[game.other, move + game.rolled] == 1 and move + game.rolled == self.game.safe_square:
                 reason = "Cannot capture opponent on rosette."
             elif game.rolled == 0:
                 reason = 'Rolled 0, can only pass (click "you")'
@@ -391,7 +392,7 @@ class InteractiveGame:
             self.do_auto_play()
 
     def do_auto_play(self):
-        while self.auto_play and self.game.turn != self.human:
+        while self.auto_play and self.game.turn != self.human and not self.game.has_finished():
             time.sleep(1)
             self.play_agent(self.grid[2, -1])
 
