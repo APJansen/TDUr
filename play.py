@@ -28,24 +28,36 @@ style_string = """
     font-size:32px;
     color:rgb(34,80,149);
 }
-.X_font{
-    font-size:125px;
-    text-align:right;
-    color: black;
+.rosette_style {
+  --size: 80px;
+  --line-width: calc(var(--size) / 10);
+  --line-horizontal: calc(var(--size) * 6/10);
+  --line-vertical: calc(var(--size) * 2/10);
+  width: var(--size);
+  height: var(--size);
+  position: relative;
+
 }
-# .X_font{
-#     font-size:180px;
-#     text-align:right;
-#     color:black;
-#     font-family: "Lucida Console";#, Arial;#"Lucida Console", "Courier New";
-#     font-stretch: ultra-expanded;
-#     #border: solid black
-#     position: relative;
-#     width: 20px;
-#     height: 20px;
-#     left: 0px;
-#     top: 0px;
-# }
+.rosette_style::before,
+.rosette_style::after {
+  position: absolute;
+  content: "";
+  background: black;
+}
+
+.rosette_style::before {
+  left: 0;
+  bottom: var(--line-horizontal);
+  width: 100%;
+  height: var(--line-width);
+}
+
+.rosette_style::after {
+  right: var(--line-vertical);
+  top: 0;
+  height: 100%;
+  width: var(--line-width);
+}
 .label_font{
     font-size:32px;
     color:rgb(250,201,1);
@@ -126,8 +138,7 @@ class InteractiveGame:
         # add rosettes
         for i in [0, 1]:
             for j in game.rosettes:
-                grid[self.transform_to_display(i, j)].description = 'X'
-                grid[self.transform_to_display(i, j)].add_class("X_font")
+                grid[self.transform_to_display(i, j)].add_class("rosette_style")
 
         # add roll and turn info
         grid[0, board_width] = self.make_button(f'{game.rolled}', color_yellow, css_style="red_font")

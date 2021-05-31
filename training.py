@@ -18,12 +18,12 @@ def update_eligibility(eligibility, decay, grad_value):
 
 
 @partial(jit, static_argnums=3)
-def get_TD_error(new_value, value, reward, winner, discount):
-    if winner == -1:
-        return reward + discount * new_value - value
-    else:
+def get_TD_error(new_value, value, reward, has_finished, discount):
+    if has_finished:
         # when the game has been won, the reward itself is the total return, shouldn't bootstrap anymore.
         return reward - value
+    else:
+        return reward + discount * new_value - value
 
 
 def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay):
@@ -65,7 +65,7 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
             reward = game.reward()
             new_value = agent.value(game.board, game.turn)
 
-            TD_error = get_TD_error(new_value, value, reward, game.winner, discount)
+            TD_error = get_TD_error(new_value, value, reward, game.has_finished(), discount)
 
             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
             agent.update_params(learning_rate * TD_error, eligibility)

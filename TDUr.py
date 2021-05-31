@@ -100,3 +100,33 @@ class TDUr:
 
         chosen_move = moves[min_max_move(values, game.turn)]
         return chosen_move
+
+    def policy_2_ply(self, game, epsilon=0):
+        game.backup()
+        moves = game.legal_moves()
+        if len(moves) == 1:
+            return moves[0]
+
+        if np.random.uniform() < epsilon:
+            return np.random.choice(moves)
+
+        boards, turns = game.simulate_moves(moves)
+        rolls = np.arange(5)
+        weights = np.array([1, 4, 6, 4, 1])  # TODO: cleaner to put this in the game class
+        expected_values = np.zeros(shape=len(moves))
+        for i, board, turn in enumerate(zip(boards, turns)):
+            roll_values = np.zeros(shape=5)
+            for rolled in rolls:
+                game.set_state((board, turn, rolled, self.winner, 0))  # TODO: deal with possibility of having won
+                moves_2 = game.legal_moves()
+                boards_2, turns_2 = game.simulate_moves(moves_2)
+                values_2 = compute_values(self.params, boards_2, turns_2)
+                chosen_move_2_board = boards_2[min_max_move(values_2, game.turn)]
+                chosen_move_2_turn = turns_2[min_max_move(values_2, game.turn)]
+                roll_values[rolled] = self.value(chosen_move_2_board, chosen_move_2_turn)
+
+            expected_values[i] = np.sum(weights * roll_values)
+
+        game.restore_backup()
+        chosen_move = moves[min_max_move(expected_values, game.turn)]
+        return chosen_move
