@@ -95,7 +95,6 @@ class Ur:
     --------------------------------------------------------------------
     s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
     --------------------------------------------------------------------
-    where t = 0 for the player whose turn it is not, and 1 for the other.
     """
 
     def __init__(self):
@@ -120,12 +119,11 @@ class Ur:
         self.display_width = 8
 
         # state
-        self.rolled = self.turn = self.other = self.winner = self.board = self.move_count = self.backup_state = None
+        self.rolled = self.turn = self.winner = self.board = self.move_count = self.backup_state = None
         self.reset()
 
     def reset(self):
         self.turn = 0
-        self.other = 1
         self.winner = -1
         self.board = np.zeros(shape=(2, self.finish + 1), dtype=np.int8)
         self.board[0, self.start] = self.n_pieces
@@ -171,11 +169,15 @@ class Ur:
                 self.winner = self.turn
             else:
                 self.turn = int(new_turn)  # need to convert from DeviceArray
-                self.other = (self.turn + 1) % 2
                 self._roll()
 
     def _change_turn(self):
-        self.turn, self.other = (self.turn + 1) % 2, self.turn
+        """Change turn, stored in attribute `turn`."""
+        self.turn = (self.turn + 1) % 2
+
+    def other(self):
+        """Return the number of the player whose turn it is not."""
+        return (self.turn + 1) % 2
 
     def reward(self):
         """Return 1 if game was won by player 0, or 0 otherwise. So always seen from player 0's perspective!"""

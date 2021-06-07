@@ -248,7 +248,7 @@ class InteractiveGame:
         self.do_auto_play()
 
     def update_turn(self):
-        self.grid[2 * self.game.other, 8].description = ' '
+        self.grid[2 * self.game.other(), 8].description = ' '
         self.grid[2 * self.game.turn, 8].description = f'{self.game.rolled}'
 
     def update_starts(self):
@@ -326,7 +326,7 @@ class InteractiveGame:
                 reason = "This would move the stone off the board."
             elif game.board[game.turn, move + game.rolled] == 1:
                 reason = "Your own stone is in the way."
-            elif game.board[game.other, move + game.rolled] == 1 and move + game.rolled == self.game.safe_square:
+            elif game.board[game.other(), move + game.rolled] == 1 and move + game.rolled == self.game.safe_square:
                 reason = "Cannot capture opponent on rosette."
             elif game.rolled == 0:
                 reason = 'Rolled 0, can only pass (click "you")'
