@@ -64,30 +64,60 @@ class TDUr:
 
     def value(self, board, turn):
         """
-        Computes value as seen from player 0.
+        Return value as seen from player 0's perspective.
         Input: board, turn
+
+        Relies on jitted `compute_value`.
         """
         return compute_value(self.params, board, turn)
 
     def value_gradient(self, board, turn):
+        """
+        Return the gradient of the value function.
+        Input: agent parameters, board, turn.
+
+        Relies on jitted grad of `compute_value`: `value_grad`."""
         return value_grad(self.params, board, turn)
 
     def get_params(self):
+        """Return agent parameters."""
         return self.params
 
     def set_params(self, parameter_values):
+        """Set agent parameters. Must be compatible with `hidden_units` attribute."""
         self.params = parameter_values
 
     def init_params(self):
+        """Initialize parameters."""
         self.params = init_network_params([self.input_units, self.hidden_units, 1], self.key)
 
     def save_params(self, name, directory='parameters'):
+        """
+        Save the current agent parameters to a file, pickled.
+        Input: name of the file
+        Keyword argument: directory='parameters', the subdirectory.
+        """
         pickle.dump(self.params, open(os.path.join(directory, name + '.pkl'), "wb"))
 
     def update_params(self, scalar, eligibility):
+        """
+        Update agent parameters.
+        Input:  - a scalar, representing the product of the learning rate and TD-error
+                - the eligibility vector
+
+        Relies on jitted `get_new_params`.
+        """
         self.params = get_new_params(self.params, scalar, eligibility)
 
     def policy(self, game, plies=1, epsilon=0):
+        """
+        Return the greedy (or epsilon-greedy) move based on the input game's state and the agent's value function.
+
+        Input: game
+        Keyword arguments:
+                - plies, default to 1, for 2 it does a 2-ply search and bases the policy on the expected values.
+                - epsilon, the chance of playing a random move.
+        """
         moves = game.legal_moves()
         if len(moves) == 1:
             return moves[0]
@@ -119,33 +149,3 @@ class TDUr:
 
         chosen_move = moves[min_max_move(values, game.turn)]
         return chosen_move
-
-    # def policy_2_ply(self, game, epsilon=0):
-    #     game.backup()
-    #     moves = game.legal_moves()
-    #     if len(moves) == 1:
-    #         return moves[0]
-    #
-    #     if np.random.uniform() < epsilon:
-    #         return np.random.choice(moves)
-    #
-    #     boards, turns, wins = game.simulate_moves(moves)
-    #
-    #     expected_values = np.zeros(shape=len(moves))
-    #     for i, (board, turn, win) in enumerate(zip(boards, turns, wins)):
-    #         if win != -1:
-    #             expected_values[i] = self.value(board, turn)
-    #         else:
-    #             roll_values = np.zeros(shape=len(game.rolls))
-    #             for rolled in game.rolls:
-    #                 game.set_state((board, turn, rolled, win, 0))
-    #
-    #                 move_2 = self.policy(game)
-    #                 game.play_move(move_2)
-    #                 roll_values[rolled] = self.value(game.board, game.turn)
-    #
-    #             expected_values[i] = np.sum(game.probabilities * roll_values)
-    #
-    #     game.restore_backup()
-    #     chosen_move = moves[min_max_move(expected_values, game.turn)]
-    #     return chosen_move
