@@ -125,6 +125,21 @@ class TDUr:
         if np.random.uniform() < epsilon:
             return np.random.choice(moves)
 
+        values = self.move_values(game, moves=moves, plies=plies)
+
+        chosen_move = moves[min_max_move(values, game.turn)]
+        return chosen_move
+
+    def move_values(self, game, moves=False, plies=1):
+        """Return afterstate values for moves given.
+
+        Input:  -game
+                -moves: a list of legal moves, or False in which case list is generated (for external use)
+                -plies, default 1 but can be 2, how many ply to search
+        """
+        if moves is False:
+            moves = game.legal_moves()
+
         boards, turns, wins = game.simulate_moves(moves)
 
         if plies == 1:
@@ -147,5 +162,4 @@ class TDUr:
 
             game.restore_backup()
 
-        chosen_move = moves[min_max_move(values, game.turn)]
-        return chosen_move
+        return values
