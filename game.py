@@ -19,11 +19,16 @@ BOARD_PIECES = 7
 
 @partial(jit, static_argnums=(1, 2))
 def legal_moves_array(board, turn, rolled):
-    # start square contains a stone to move, and won't move it beyond the finish
-    moves_with_legal_start = board[turn, 0:BOARD_FINISH + 1 - rolled] > 0
+    # moves that don't move a stone beyond the finish, based only on the die roll
+    start_squares = board[turn, 0:BOARD_FINISH + 1 - rolled]
+    # the corresponding end squares
+    end_squares = board[turn, rolled: BOARD_FINISH + 1]
 
-    # end square is within range and does not contain player stone (or is finish)
-    moves_with_legal_end = board[turn, rolled: BOARD_FINISH + 1] == 0
+    # start square contains a stone to move
+    moves_with_legal_start = start_squares > 0
+
+    # end square does not contain player stone (or is finish)
+    moves_with_legal_end = end_squares == 0
     moves_with_legal_end = index_update(moves_with_legal_end, index[-1], True)
 
     # it's not a capture on the safe space
