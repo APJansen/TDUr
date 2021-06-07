@@ -87,10 +87,11 @@ color_red = 'rgb(221,1,0)'
 
 class InteractiveGame:
 
-    def __init__(self, agent_parameters):
+    def __init__(self, agent_parameters, search_plies=2):
         self.game = Ur()
         self.agent = TDUr(hidden_units=agent_parameters[0][0].shape[0])
         self.agent.set_params(agent_parameters)
+        self.search_plies = search_plies
 
         self.human = 0
         self.auto_play = False
@@ -213,7 +214,7 @@ class InteractiveGame:
         elif self.game.turn == self.human:
             self.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
         else:
-            move = self.agent.policy(self.game)
+            move = self.agent.policy(self.game, plies=self.search_plies)
             self.play_and_update(move)
 
     def play_and_update(self, move):

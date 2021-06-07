@@ -1,19 +1,18 @@
 import numpy as np
 
 
-def compete_policies(game, pi_1, pi_2, episodes=1_000):
+def compete_policies(game, pi_1, pi_2, episodes=1_000, search_plies_1=1, search_plies_2=1):
     scores = [0, 0]
     for episode in range(episodes):
         game.reset()
         player_1 = episode % 2
-        player_2 = (player_1 + 1) % 2
 
         while game.winner == -1:
             if game.turn == player_1:
-                move = pi_1.policy(game, epsilon=0)
+                move = pi_1.policy(game, epsilon=0, plies=search_plies_1)
             else:
-                move = pi_2.policy(game, epsilon=0)
-            game.play_move(move, checks=False)
+                move = pi_2.policy(game, epsilon=0, plies=search_plies_2)
+            game.play_move(move)
 
         if game.winner == player_1:
             scores[0] += 1

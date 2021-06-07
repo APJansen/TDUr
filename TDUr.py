@@ -87,7 +87,7 @@ class TDUr:
     def update_params(self, scalar, eligibility):
         self.params = get_new_params(self.params, scalar, eligibility)
 
-    def policy(self, game, epsilon=0):
+    def policy(self, game, plies=1, epsilon=0):
         moves = game.legal_moves()
         if len(moves) == 1:
             return moves[0]
@@ -95,38 +95,57 @@ class TDUr:
         if np.random.uniform() < epsilon:
             return np.random.choice(moves)
 
-        boards, turns = game.simulate_moves(moves)
-        values = compute_values(self.params, boards, turns)
+        boards, turns, wins = game.simulate_moves(moves)
+
+        if plies == 1:
+            values = compute_values(self.params, boards, turns)
+        else:  # plies == 2
+            game.backup()
+
+            values = np.zeros(shape=len(moves))
+            for i, (board, turn, win) in enumerate(zip(boards, turns, wins)):
+                if win != -1:
+                    values[i] = self.value(board, turn)
+                else:
+                    roll_values = np.zeros(shape=len(game.rolls))
+                    for roll in game.rolls:
+                        game.set_state((board, turn, roll, win, 0))
+                        game.play_move(self.policy(game))
+                        roll_values[roll] = self.value(game.board, game.turn)
+
+                    values[i] = np.sum(game.probabilities * roll_values)
+
+            game.restore_backup()
 
         chosen_move = moves[min_max_move(values, game.turn)]
         return chosen_move
 
-    def policy_2_ply(self, game, epsilon=0):
-        game.backup()
-        moves = game.legal_moves()
-        if len(moves) == 1:
-            return moves[0]
-
-        if np.random.uniform() < epsilon:
-            return np.random.choice(moves)
-
-        boards, turns = game.simulate_moves(moves)
-        rolls = np.arange(5)
-        weights = np.array([1, 4, 6, 4, 1])  # TODO: cleaner to put this in the game class
-        expected_values = np.zeros(shape=len(moves))
-        for i, board, turn in enumerate(zip(boards, turns)):
-            roll_values = np.zeros(shape=5)
-            for rolled in rolls:
-                game.set_state((board, turn, rolled, self.winner, 0))  # TODO: deal with possibility of having won
-                moves_2 = game.legal_moves()
-                boards_2, turns_2 = game.simulate_moves(moves_2)
-                values_2 = compute_values(self.params, boards_2, turns_2)
-                chosen_move_2_board = boards_2[min_max_move(values_2, game.turn)]
-                chosen_move_2_turn = turns_2[min_max_move(values_2, game.turn)]
-                roll_values[rolled] = self.value(chosen_move_2_board, chosen_move_2_turn)
-
-            expected_values[i] = np.sum(weights * roll_values)
-
-        game.restore_backup()
-        chosen_move = moves[min_max_move(expected_values, game.turn)]
-        return chosen_move
+    # def policy_2_ply(self, game, epsilon=0):
+    #     game.backup()
+    #     moves = game.legal_moves()
+    #     if len(moves) == 1:
+    #         return moves[0]
+    #
+    #     if np.random.uniform() < epsilon:
+    #         return np.random.choice(moves)
+    #
+    #     boards, turns, wins = game.simulate_moves(moves)
+    #
+    #     expected_values = np.zeros(shape=len(moves))
+    #     for i, (board, turn, win) in enumerate(zip(boards, turns, wins)):
+    #         if win != -1:
+    #             expected_values[i] = self.value(board, turn)
+    #         else:
+    #             roll_values = np.zeros(shape=len(game.rolls))
+    #             for rolled in game.rolls:
+    #                 game.set_state((board, turn, rolled, win, 0))
+    #
+    #                 move_2 = self.policy(game)
+    #                 game.play_move(move_2)
+    #                 roll_values[rolled] = self.value(game.board, game.turn)
+    #
+    #             expected_values[i] = np.sum(game.probabilities * roll_values)
+    #
+    #     game.restore_backup()
+    #     chosen_move = moves[min_max_move(expected_values, game.turn)]
+    #     return chosen_move

@@ -26,16 +26,19 @@ def get_TD_error(new_value, value, reward, has_finished, discount):
         return reward + discount * new_value - value
 
 
-def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay):
+def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay, search_plies=1):
     name = f'N{agent.hidden_units:d}'
     name += f'-alpha{learning_rate:.3f}'
     name += f'-lambda{lmbda:.2f}'
     name += f'-epsilon{epsilon:.5f}'
     name += f'-dalpha{lr_decay:.6f}'
+    if search_plies > 1:
+        name += f'-plies{search_plies}'
+
     return name
 
 
-def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, checks=False, iprint=100, save=False,
+def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, search_plies=1, iprint=100, save=False,
           learning_rate_decay=1, episode_start=0, custom_name=False):
     red_wins = 0
     start = time.time()
@@ -44,7 +47,7 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
     if custom_name:
         name = custom_name
     else:
-        name = compose_name(agent, learning_rate, epsilon, lmbda, learning_rate_decay)
+        name = compose_name(agent, learning_rate, epsilon, lmbda, learning_rate_decay, search_plies)
 
     for episode in range(episode_start, episode_start + episodes + 1):
         game.reset()
@@ -57,8 +60,8 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, chec
             value = new_value
             grad_value = agent.value_gradient(game.board, game.turn)
 
-            move = agent.policy(game, epsilon)
-            game.play_move(move, checks)
+            move = agent.policy(game, epsilon=epsilon, plies=search_plies)
+            game.play_move(move)
 
             # no matter who's playing, we always want to estimate the probability of winning of player 0
             # the only point where turn number should enter is in choosing the next move, which is max/min on that

@@ -14,6 +14,7 @@ BOARD_MID_ENDED = 13
 BOARD_START = 0
 BOARD_FINISH = 15
 BOARD_SAFE_SQUARE = 8
+BOARD_PIECES = 7
 
 
 @partial(jit, static_argnums=(1, 2))
@@ -58,9 +59,12 @@ def get_new_board(board, move, rolled, turn):
     values = values + [(1 - capture_board[end]) * board[other, end],
                        board[other, BOARD_START] + capture_board[end] * board[other, end]]
 
-    board_new = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
+    new_board = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
 
-    return board_new, new_turn
+    not_finished = jnp.sign(BOARD_PIECES - new_board[turn, BOARD_FINISH])
+    new_winner = not_finished * -1 + (1 - not_finished) * turn
+
+    return new_board, new_turn, new_winner
 
 
 get_new_boards = jit(vmap(get_new_board, in_axes=(None, 0, None, None)))
@@ -99,11 +103,13 @@ class Ur:
         self.mid_ended = BOARD_MID_ENDED
 
         # piece
-        self.n_pieces = 7
+        self.n_pieces = BOARD_PIECES
 
         # die
         self.n_die = 4
         self.die_faces = 2
+        self.rolls = np.arange(5)
+        self.probabilities = np.array([1, 4, 6, 4, 1]) / 16
 
         # display
         self.display_width = 8
@@ -184,11 +190,11 @@ class Ur:
             self.change_turn()
             self.roll()
         else:
-            new_board, new_turn = get_new_board(self.board, move, self.rolled, self.turn)
+            new_board, new_turn, new_winner = get_new_board(self.board, move, self.rolled, self.turn)
 
             self.board = np.array(new_board)
 
-            if self.board[turn_played, self.finish] == self.n_pieces:
+            if new_winner != -1:
                 self.winner = self.turn
             else:
                 self.turn = int(new_turn)  # need to convert from DeviceArray
@@ -196,7 +202,7 @@ class Ur:
                 self.roll()
 
     def change_turn(self):
-        self.turn, self.other = self.other, self.turn
+        self.turn, self.other = (self.turn + 1) % 2, self.turn
 
     def reward(self):
         if not self.has_finished():
