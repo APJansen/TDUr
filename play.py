@@ -357,6 +357,8 @@ class InteractiveGame:
             self.game.reset()
             self.human = (self.human + 1) % 2
             self.update_all_buttons()
+            if self.auto_play:
+                self.do_auto_play()
 
     def update_all_buttons(self):
         self.update_turn()
