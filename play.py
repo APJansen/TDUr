@@ -31,8 +31,8 @@ style_string = """
 .rosette_style {
   --size: 80px;
   --line-width: calc(var(--size) / 10);
-  --line-horizontal: calc(var(--size) * 6/10);
-  --line-vertical: calc(var(--size) * 2/10);
+  --line-horizontal: calc(var(--size) * 3/10);
+  --line-vertical: calc(var(--size) * 5.5/10);
   width: var(--size);
   height: var(--size);
   position: relative;
