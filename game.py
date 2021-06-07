@@ -85,11 +85,11 @@ class Ur:
     To fully specify a game state, this needs to be supplemented with the last die throw and whose turn it is.
 
     we unroll this and copy the middle row that's shared between the two players, to give:
-    ------------------------------------------------------------------------
-    s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f | t |
-    ----------------------------------------------------------------------
-    s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f | t |
-    ------------------------------------------------------------------------
+    --------------------------------------------------------------------
+    s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
+    --------------------------------------------------------------------
+    s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
+    --------------------------------------------------------------------
     where t = 0 for the player whose turn it is not, and 1 for the other.
     """
 
@@ -115,7 +115,7 @@ class Ur:
         self.display_width = 8
 
         # state
-        self.rolled = self.turn = self.other = self.winner = self.board = self.move_count = self.backup_data = None
+        self.rolled = self.turn = self.other = self.winner = self.board = self.move_count = self.backup_state = None
         self.reset()
 
     def reset(self):
@@ -127,26 +127,17 @@ class Ur:
         self.board[1, self.start] = self.n_pieces
 
         self.move_count = 0
-        self.roll()
+        self._roll()
 
-    def roll(self):
+    def _roll(self):
+        """Roll the dice, store result in attribute `rolled`."""
         self.rolled = np.sum(np.random.randint(self.die_faces, size=self.n_die))
 
-    def legal_moves_slow(self):
-        if self.rolled == 0:
-            return ['pass']
-
-        moves = []
-        for start in range(self.finish + 1 - self.rolled):
-            if self.is_legal_move(start):
-                moves.append(start)
-
-        if not moves:
-            moves = ['pass']
-
-        return moves
-
     def legal_moves(self):
+        """Return a list of legal moves.
+        A move is represented by the square number of the piece that is moved, counted along the route.
+
+        Relies on jitted function `legal_moves_array`."""
         if self.rolled == 0:
             moves = []
         else:
@@ -154,41 +145,18 @@ class Ur:
             moves = np.where(moves_array)[0].tolist()
         return moves if moves else ['pass']
 
-    # Not used as moves are played by selecting from legal_moves
-    def is_legal_move(self, move):
-        # 0. a pass is only legal if there are no other moves
-        if move == 'pass':
-            return self.legal_moves() == ['pass']
-
-        # Conditions under which it's false:
-        # 1. either start or end square off the board
-        if not self.start <= move <= self.finish - self.rolled:
-            return False
-
-        # 2. no player stone to move
-        if self.board[self.turn, move] == 0:
-            return False
-
-        end = move + self.rolled
-
-        # 3. player occupies end square, and it's not the finish square
-        if self.board[self.turn, end] == 1 and end != self.finish:
-            return False
-
-        # 4. end square is the safe space and the opponent occupies it
-        if end == self.safe_square and self.board[self.other, self.safe_square] == 1:
-            return False
-
-        # otherwise it's legal
-        return True
-
     def play_move(self, move):
+        """Input: the move to play.
+        A move is represented by the square number of the piece that is moved, counted along the route.
+        Plays the move on the board, changes turn (if appropriate) and rolls the dice again.
+        Also increments `move_count` and sets `winner` to the player who moved if the game is won.
+
+        Relies on the jitted function `get_new_board`."""
         self.move_count += 1
-        turn_played = self.turn
 
         if move == 'pass':
-            self.change_turn()
-            self.roll()
+            self._change_turn()
+            self._roll()
         else:
             new_board, new_turn, new_winner = get_new_board(self.board, move, self.rolled, self.turn)
 
@@ -199,12 +167,13 @@ class Ur:
             else:
                 self.turn = int(new_turn)  # need to convert from DeviceArray
                 self.other = (self.turn + 1) % 2
-                self.roll()
+                self._roll()
 
-    def change_turn(self):
+    def _change_turn(self):
         self.turn, self.other = (self.turn + 1) % 2, self.turn
 
     def reward(self):
+        """Return 1 if game was won by player 0, or 0 otherwise. So always seen from player 0's perspective!"""
         if not self.has_finished():
             return 0
         elif self.winner == 0:
@@ -214,34 +183,43 @@ class Ur:
             return 0
 
     def has_finished(self):
+        """Return True if the game has finished, False if not."""
         return self.winner != -1
 
     # to allow n-step methods and planning
     def get_state(self):
+        """Return the current state of the game.
+        The state consists of a tuple:
+        (board, turn, rolled, winner, move_count)"""
         return self.board.copy(), self.turn, self.rolled, self.winner, self.move_count
 
     def set_state(self, state):
+        """Set the game to the input state.
+
+        Input: a game state of the form (board, turn, rolled, winner, move_count).
+        """
         self.board, self.turn, self.rolled, self.winner, self.move_count = state
 
     def backup(self):
-        self.backup_data = self.get_state()
+        """Store the current state of the game in the attribute `backup_state`."""
+        self.backup_state = self.get_state()
 
     def restore_backup(self):
-        self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_data
-
-    def simulate_move(self, move, checks=True):
-        self.backup()
-        self.play_move(move)
-        reward = self.reward()
-        board = self.board.copy()
-        self.restore_backup()
-        return reward, board
+        """Restore the current state of the game from the attribute `backup_state`"""
+        self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_state
 
     def simulate_moves(self, moves):
+        """Give afterstates resulting from moves.
+
+        Input: a list of (legal) moves.
+
+        Output: a list of tuples (board, turn, winner), as resulting from each move.
+
+        Relies on function `get_new_boards`, a `vmap` of `get_new_board`"""
         return get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
 
-    # testing
     def check_valid_board(self):
+        """Return True if current board is valid, otherwise returns a string describing the first found violation."""
         board = self.board
 
         if board.dtype != 'int8':
@@ -252,18 +230,14 @@ class Ur:
             return 'more than one stone on square'
         if jnp.min(on_board) < 0:
             return 'less than 0 stones on square'
-        if jnp.sum(board[0, self.start: self.finish + 1]) != self.n_pieces:
-            return 'number of pieces not conserved (player 0)'
-        if jnp.sum(board[1, self.start: self.finish + 1]) != self.n_pieces:
-            return 'number of pieces not conserved (player 1)'
-        if not (0 <= board[0, self.start] <= self.n_pieces):
-            return 'illegal start pieces (player 0)'
-        if not (0 <= board[1, self.start] <= self.n_pieces):
-            return 'illegal start pieces (player 1)'
-        if not (0 <= board[0, self.finish] <= self.n_pieces):
-            return 'illegal start pieces (player 0)'
-        if not (0 <= board[1, self.finish] <= self.n_pieces):
-            return 'illegal start pieces (player 1)'
+
+        for player in [0, 1]:
+            if jnp.sum(board[player, self.start: self.finish + 1]) != self.n_pieces:
+                return f'number of pieces not conserved (player {player})'
+            if not (0 <= board[player, self.start] <= self.n_pieces):
+                return f'illegal start pieces (player {player})'
+            if not (0 <= board[player, self.finish] <= self.n_pieces):
+                return f'illegal finish pieces (player {player})'
 
         overlap_board = board[:, self.mid_start:self.mid_ended]
         if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.mid_ended - self.mid_start, dtype='int8')).all():
@@ -278,14 +252,15 @@ class Ur:
 
     # Last 3 functions only for display purposes
     def display(self):
-        board_display = self.reshape_board()
+        """Display the game board in the current state, in the conventional shape."""
+        board_display = self._reshape_board()
 
         cmap = colors.ListedColormap(['b', 'w', 'r', 'y'])
 
         plt.imshow(board_display, cmap=cmap, extent=(0, self.display_width, 3, 0), vmin=-1, vmax=3)
-        self.annotate_board()
+        self._annotate_board()
 
-    def reshape_board(self):
+    def _reshape_board(self):
         reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
         reshaped_board[1] = (self.board[0, self.mid_start:self.mid_ended] -
                              self.board[1, self.mid_start:self.mid_ended])
@@ -296,7 +271,7 @@ class Ur:
                 self.board[player, self.mid_ended:-1])
         return reshaped_board
 
-    def annotate_board(self):
+    def _annotate_board(self):
         t_x, t_y = 4.2, 0.7
         # stones at start and finish
         stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]

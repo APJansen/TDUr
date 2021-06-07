@@ -356,9 +356,9 @@ class InteractiveGame:
         else:
             self.game.reset()
             self.human = (self.human + 1) % 2
-            self.reset_all_buttons()
+            self.update_all_buttons()
 
-    def reset_all_buttons(self):
+    def update_all_buttons(self):
         self.update_turn()
         self.update_players()
         self.remove_error()
