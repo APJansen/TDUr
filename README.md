@@ -82,17 +82,28 @@ To illustrate the types of strategic decisions the game presents, here are two g
 ![plot](./images/StrategyExamples.png)
 
 On the left board it's red's turn to move, with a throw of 2 (as indicated in the rightmost yellow squares).
-Red can move 3 stones. 
-Moving h3 will put that stone at the finish once and for all, but the stone was already safe on h3. 
-Moving d2 will capture the opponent's most advanced stone on f2, but it will also give up the important strategic point on d2, where one cannot be captured.
-And moving c3 will give another turn, with the potential of throwing another 2 and so also achieving one of the other possibilities.
-Is it worth giving up the safe square this early in the game risking the opponent taking it? 
-Or is it too risky to play c3 for another move and possibly let the opponent's stone advance to safety? 
+Red can move 3 stones, which we label by the coordinate of the stone that is moved: 
+- h3 moves that stone to the finish
+- c3 moves to a rosette, giving another turn
+- d2 captures the opponent's most advanced stone on f2
+
+They all look good, but also all have downsides. Moving h3 to the finish might not be the most urgent as it is safe already. 
+It also gives up the opportunity to land on the rosette with a future throw of 1.
+Moving c3 to the rosette is risky, it will give the best result if the next roll of the dice is good, say another 2, but if it's bad it achieves the least.
+Finally moving d2 also gives up the middle rosette, which is a strong outpost that can block the opponent's progress for the whole game if it is kept (as capture on the rosette is not allowed).
+
 TD-Ur chose to capture with d2 here.
 
-On the right board
+On the right board, it is again the red player's turn to move with a throw of 1.
+There are 4 available moves
+- b1 moves to a rosette and gives another turn
+- b2 moves that stone closer to the finish and reduces its chance of being captured
+- g3 moves that stone to the finish
+- e3 puts another stone on the board
+Considerations are similar here to the other board, b3 could turn out very well if the next throw is good, but we could also throw a 0, or even a 2 would be bad.
+Moving g3 to the finish might not seem most urgent, but only a rather rare throw of 1 can do this, so if we postpone it for too long we might end up with our last stone stuck there.
 
-TODO: add another board
+TD-Ur chose to move g4 to the finish.
 
 <a name="tdur"/>
 
@@ -134,7 +145,9 @@ This often involves having the agent learn a _value function_, an estimate of th
 This value function can be allowed to depend only on the current state, or also on the chosen action, when it's called an action value.
 For games such as this where the transition to a new state can be decomposed into first a deterministic part and then a probabilistic part, it is convenient to choose a middle ground, namely the afterstate. So the input to our value function will be the board configuration and whose turn it is, but it does not include the dice roll, and it's not necessarily the agent's turn.
 
-Given such an afterstate s_a obtained from the deterministic part of the transition after taking action a in state s, we want to learn to estimate a number  0 <= v(s_a) <= 1 ![equation](https://latex.codecogs.com/svg.latex?0%20%5Cleq%20v%28s_a%29%20%5Cleq%201%7B%5Ccolor%7BDarkOrange%7D%20%7D) representing the probability of winning the game.
+Given such an afterstate s_a obtained from the deterministic part of the transition after taking action a in state s, we want to learn to estimate a number
+![equation](https://latex.codecogs.com/svg.latex?0%20%5Cleq%20v%28s_a%29%20%5Cleq%201%7B%5Ccolor%7BDarkOrange%7D%20%7D) <!-- 0 <= v(s_a) <= 1 -->
+representing the probability of winning the game.
 We will use a neural network to represent this function. A simple fully connected network with one hidden layer will do. Using a sigmoid activation function on the final layer guarantees that the value will be between 0 and 1.
 Initializing the weights as random small numbers, our initial estimate will have values near 0.5, with no structure or meaning to it.
 
@@ -162,9 +175,11 @@ Iterating this is called _policy iteration_, and will allow us to converge to th
 Now how do we update our estimate of the value function?
 We do this using _Temporal Difference (TD) Learning_, whose basic premise is that future states have more information than present states.
 The logic is that a. they are closer to the final win/loss state, and b. they have experienced more environment dynamics.
-So what we can do is compute the value of the current state, V(S_t), and then take a step (using the policy whose value we're estimating), and compute the value V(S_t+1) there.
-Assuming that the latter is more accurate, we want to update our estimate to move V(S_t) closer to V(S_t+1). In other words we want to minimize (V(S_t+1) - V(S_t))^2, but only through V(S_t). Now V is a neural network, parametrized by weights W, so we can do this using gradient descent, resulting in the weight update
-W_t+1 = W_t + alpha (V_(S_t+1) - V(S_t)) \nabla_W V(S_t)
+So what we can do is compute the value of the current state, ![equation](https://latex.codecogs.com/gif.latex?v(S_t)), and then take a step (using the policy whose value we're estimating), and compute the value ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})) there.
+Assuming that the latter is more accurate, we want to update our estimate to move ![equation](https://latex.codecogs.com/gif.latex?v(S_t)) closer to ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})). In other words we want to minimize ![equation](https://latex.codecogs.com/gif.latex?(v(S_t&plus;1)&space;-&space;v(S_t))^2), but only through ![equation](https://latex.codecogs.com/gif.latex?v(S_t)),. Now v is a neural network, parametrized by weights w, so we can do this using gradient descent, resulting in the weight update
+
+![equation](https://latex.codecogs.com/gif.latex?w_{t&plus;1}&space;=&space;w_t&space;&plus;&space;\alpha&space;(R_{t&plus;1}&space;&plus;&space;v(S_{t&plus;1})&space;-&space;v(S_t))&space;\nabla_w&space;v(S_t))
+<!-- w_{t+1} = w_t + \alpha (R_{t+1} + v(S_{t+1}) - v(S_t)) \nabla_w v(S_t) -->
 This is called _semi-gradient descent_ because we keep the future estimate fixed. This is very important, if we do not do this we are not making use of the fact that future estimates are more accurate than present estimates.
 
 <a name="eligibility" />
@@ -176,7 +191,9 @@ This is a usually suboptimal solution to the _credit assignment problem_, which 
 
 A more elegant and usually more efficient solution to this problem is called TD(lambda).
 This uses an _eligibility trace_, which is an exponentially decaying average of the gradient of the value function,
-z_t+1 = lambda z_t + nabla_w v,
+
+![equation](https://latex.codecogs.com/gif.latex?z_{t&plus;1}&space;=&space;\lambda&space;z_t&space;&plus;&space;\nabla_w&space;v)
+<!-- z_{t+1} = \lambda z_t + \nabla_w v -->
 where lambda in (0,1) specifies the decay rate, and thus the time scale over which previous moves are considered to have an impact on the current value.
 When lambda=0 we recover the previous 1-step TD, but often, and indeed in our case too, lambda=0.9 is found to be more efficient.
 
@@ -184,13 +201,36 @@ When lambda=0 we recover the previous 1-step TD, but often, and indeed in our ca
 
 ## Search
 
-TODO: implement and explain search
+Again following TD-Gammon, we use a 2-ply search. 
+A ply is a single player's move, so a one ply search would be to look at all available moves, evaluate their after states, and choose the move with the highest value after state (or lowest for the blue player).
+A two ply search, as it is done in TD-Gammon and as we do here, works as follows. The afterstates found after 1-ply are not full states, they need to be supplemented with a new roll of the dice. We complete them in all possible ways, that is, with die rolls from 0 to 4.
+This then forms another full state, typically with the opponent to move (unless landing on a rosette). 
+For each of these states, we do another 1-ply search to find the move that is best for whoever's turn it is, and compute the value of the resulting afterstate.
+So now for a given initial move, we have the 5 possible die rolls combined with the value of the best following move's after state.
+We sum these up, weighted with the probability of the corresponding die roll (these probabilities are (1, 4, 6, 4, 1)/16 for throws of 0, 1, 2, 3, 4 respectively).
+This gives the expected 2-ply afterstate value.
+The move we choose then is the one that maximizes this value.
+
+We do this both during training and during play after training. 
 
 <a name="selfplay"/>
 
 ## Self-Play
 
-TODO
+So far we have described the methods by which the agent can improve through playing the game. But who does it play against?
+We want it to be able to play a lot of games quickly, so its opponent should also be an AI, and we want its opponent to also grow in strength, 
+it won't learn much by playing against random moves for example.
+
+The obvious answer is that it plays itself.
+This brings the risk that it will learn a strategy that works well against the same strategy but fails against another strategy it does not know.
+One could train it against an ensemble of previous versions or instantiations of itself to avoid this.
+Here however, due to the simplicity of Ur and the random component that brings a degree of exploration, this is unlikely to be an issue.
+
+It can be a bit confusing to have the agent play both sides, and update its weights on all moves done during training.
+To make this clearer, we have set it up so that no matter whose turn it is, we always want to improve our estimate of the value function as seen from the point of view of the red player. The eligibility vector tracks the influence of older decisions on this value function.
+So neither of these, the value function or the eligibility vector, or how the updates are done, depend on whose turn it is.
+The only place where this enters is that if it is the red player's turn, they will choose the move that maximizes the value function, 
+while if it is the blue player's turn they will choose the move that minimizes the value function.
 
 <a name="details"/>
 
@@ -232,4 +272,9 @@ Finally, for the final TD error, when a game is finished, we use the reward minu
 
 ### Hyperparameters
 State which used for the best agent, a little bit about how searched for.
+- hidden units
+- learning rate
+- lambda
+- epsilon,
+- search depth, 1 or 2
 
