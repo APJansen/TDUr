@@ -94,7 +94,6 @@ class InteractiveGame:
         self.search_plies = search_plies
 
         self.human = 0
-        self.auto_play = False
 
         self.out = ipyw.Output()
 
@@ -103,7 +102,7 @@ class InteractiveGame:
         self.board_width = 8
         self.grid = self.create_interactive_board()
         self.message_grid = self.create_message_grid()
-        self.option_grid = self.create_option_grid()
+        self.options = Options(self, cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
         self.scores = Scores(cell_height=self.cell_height, cell_width=1.5 * self.square_size, cells_high=4, cells_wide=2)
         self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
         self.game_interface = self.create_interface()
@@ -161,21 +160,11 @@ class InteractiveGame:
 
         return message_grid
 
-    def create_option_grid(self):
-        option_grid = ipyw.GridspecLayout(4, 1, width=f'{3 * self.square_size}px',
-                                          height=f'{4 * 0.4 * self.square_size}px')
-        option_grid[1, 0] = make_button('New Game', color_yellow, css_style="button_font",
-                                             action=self.start_new_game)
-        option_grid[3, 0] = make_button('auto-play: off', color_yellow, css_style="button_font",
-                                             action=self.toggle_auto_play)
-
-        return option_grid
-
     def create_interface(self):
         interface = ipyw.VBox(children=[
             self.labels.grid,
             self.grid,
-            ipyw.HBox(children=[self.option_grid, self.message_grid, self.scores.grid])])
+            ipyw.HBox(children=[self.options.grid, self.message_grid, self.scores.grid])])
         interface.add_class("box_style")
         return interface
 
@@ -330,7 +319,7 @@ class InteractiveGame:
             self.game.reset()
             self.human = (self.human + 1) % 2
             self.update_all_buttons()
-            if self.auto_play:
+            if self.options.auto_play:
                 self.do_auto_play()
 
     def update_all_buttons(self):
@@ -369,17 +358,8 @@ class InteractiveGame:
 
         return i_internal, j_internal
 
-    def toggle_auto_play(self, button):
-        if self.auto_play:
-            self.auto_play = False
-            self.option_grid[3, 0].description = 'auto-play: off'
-        else:
-            self.auto_play = True
-            self.option_grid[3, 0].description = 'auto-play: on'
-            self.do_auto_play()
-
     def do_auto_play(self):
-        while self.auto_play and self.game.turn != self.human and not self.game.has_finished():
+        while self.options.auto_play and self.game.turn != self.human and not self.game.has_finished():
             time.sleep(1)
             self.play_agent(self.grid[2, -1])
 
@@ -389,6 +369,36 @@ class InteractiveGame:
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
+
+
+class Options:
+    def __init__(self, interface, cell_height, cell_width, cells_high, cells_wide):
+        self.new_game_index = 1
+        self.auto_play_index = 3
+        self.interface = interface
+
+        self.auto_play = False
+
+        self.grid = self.make_grid(interface, cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, interface, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+
+        grid[self.new_game_index, :] = make_button('New Game', color_yellow, css_style="button_font",
+                                                   action=interface.start_new_game)
+        grid[self.auto_play_index, :] = make_button('auto-play: off', color_yellow, css_style="button_font",
+                                                    action=self.toggle_auto_play)
+
+        return grid
+
+    def toggle_auto_play(self, button):
+        if self.auto_play:
+            self.auto_play = False
+            self.grid[self.auto_play_index, :].description = 'auto-play: off'
+        else:
+            self.auto_play = True
+            self.grid[self.auto_play_index, :].description = 'auto-play: on'
+            self.interface.do_auto_play()
 
 
 class Scores:
