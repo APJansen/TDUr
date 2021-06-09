@@ -101,7 +101,7 @@ class InteractiveGame:
         self.cell_height = 0.4 * self.square_size
         self.board_width = 8
         self.grid = self.create_interactive_board()
-        self.message_grid = self.create_message_grid()
+        self.messages = Messages(cell_height=4/3 * self.cell_height, cell_width=self.square_size, cells_high=3, cells_wide=5)
         self.options = Options(self, cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
         self.scores = Scores(cell_height=self.cell_height, cell_width=1.5 * self.square_size, cells_high=4, cells_wide=2)
         self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
@@ -146,25 +146,17 @@ class InteractiveGame:
 
         # add player info
         grid[0, board_width + 1:] = make_button('You', color_yellow, css_style="red_font_small",
-                                                     action=self.play_pass)
+                                                action=self.play_pass)
         grid[2, board_width + 1:] = make_button('TD-Ur', color_yellow, css_style="blue_font_small",
-                                                     action=self.play_agent)
+                                                action=self.play_agent)
 
         return grid
-
-    def create_message_grid(self, message_width=5, message_height=4):
-        message_grid = ipyw.GridspecLayout(3, 1, width=f'{5 * self.square_size}px',
-                                           height=f'{4 * 0.4 * self.square_size}px')
-        message_grid[1, 0] = make_label(' ', css_style="message_style")
-        message_grid[2, 0] = make_label(' ', css_style="detailed_message_style")
-
-        return message_grid
 
     def create_interface(self):
         interface = ipyw.VBox(children=[
             self.labels.grid,
             self.grid,
-            ipyw.HBox(children=[self.options.grid, self.message_grid, self.scores.grid])])
+            ipyw.HBox(children=[self.options.grid, self.messages.grid, self.scores.grid])])
         interface.add_class("box_style")
         return interface
 
@@ -177,13 +169,13 @@ class InteractiveGame:
         if 'pass' in self.game.legal_moves():
             self.play_and_update('pass')
         else:
-            self.display_error("You shall not pass!", "You have a legal move")
+            self.messages.display_error("You shall not pass!", "You have a legal move")
 
     def play_agent(self, button):
         if self.game.has_finished():
-            self.display_error("The game has finished!", "Click New Game to start a new one.")
+            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
         elif self.game.turn == self.human:
-            self.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
+            self.messages.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
         else:
             move = self.agent.policy(self.game, plies=self.search_plies)
             self.play_and_update(move)
@@ -191,7 +183,7 @@ class InteractiveGame:
     def play_and_update(self, move):
         """Given a legal move, this plays it on the internal board, and updates all affected buttons."""
         game = self.game
-        self.remove_error()
+        self.messages.clear()
         if move == 'pass':
             game.play_move(move)
         else:
@@ -208,7 +200,7 @@ class InteractiveGame:
 
             if game.has_finished():
                 self.scores.update(game.winner, self.human)
-                self.print_result()
+                self.messages.display_result(game.winner, self.human)
 
         self.update_turn()
 
@@ -276,10 +268,12 @@ class InteractiveGame:
 
         if game.has_finished():
             is_legal = False
-            self.display_error("The game has finished!", "Click New Game to start a new one.")
+            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
+            return is_legal
         elif game.turn != self.human:
             is_legal = False
-            self.display_error("It's TD-Ur's turn!", "Click its name to let it make a move.")
+            self.messages.display_error("It's TD-Ur's turn!", "Click its name to let it make a move.")
+            return is_legal
         elif move not in game.legal_moves():
             is_legal = False
             if game.board[game.turn, move] == 0:
@@ -294,27 +288,13 @@ class InteractiveGame:
                 reason = 'Rolled 0, can only pass (click "you")'
             else:
                 reason = "Not sure why..?"
-            self.display_error("Not a legal move!", reason)
+            self.messages.display_error("Not a legal move!", reason)
 
         return is_legal
 
-    def display_error(self, message, details):
-        self.message_grid[1, 0].value = message
-        self.message_grid[2, 0].value = details
-
-    def remove_error(self):
-        self.message_grid[1, 0].value = ''
-        self.message_grid[2, 0].value = ''
-
-    def print_result(self):
-        if self.game.winner == self.human:
-            self.display_error("You won this game!", "Congratulations!")
-        else:
-            self.display_error("You lost this game!", "Better luck next time!")
-
     def start_new_game(self, button):
         if self.game.winner == -1:
-            self.display_error("Game not yet finished!", "Finish this one before starting next.")
+            self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
         else:
             self.game.reset()
             self.human = (self.human + 1) % 2
@@ -325,7 +305,7 @@ class InteractiveGame:
     def update_all_buttons(self):
         self.update_turn()
         self.update_players()
-        self.remove_error()
+        self.messages.clear()
         for i in range(3):
             for j in range(self.game.display_width):
                 self.update_board_square(i, j, 0)
@@ -432,6 +412,35 @@ class Scores:
 
         self.grid[self.player_score_indices].value = f'{self.values[0]}'
         self.grid[self.player_score_indices].value = f'{self.values[1]}'
+
+
+class Messages:
+    def __init__(self, cell_height, cell_width, cells_high, cells_wide):
+        self.main_index = 1
+        self.detail_index = 2
+        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+
+        grid[self.main_index, :] = make_label(' ', css_style="message_style")
+        grid[self.detail_index, :] = make_label(' ', css_style="detailed_message_style")
+
+        return grid
+
+    def display_error(self, message, details):
+        self.grid[self.main_index, :].value = message
+        self.grid[self.detail_index, :].value = details
+
+    def clear(self):
+        self.grid[self.main_index, :].value = ''
+        self.grid[self.detail_index, :].value = ''
+
+    def display_result(self, winner, human):
+        if winner == human:
+            self.display_error("You won this game!", "Congratulations!")
+        else:
+            self.display_error("You lost this game!", "Better luck next time!")
 
 
 class Labels:
