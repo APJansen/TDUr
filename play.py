@@ -100,12 +100,13 @@ class InteractiveGame:
         self.out = ipyw.Output()
 
         self.square_size = 88
+        self.cell_height = 0.4 * self.square_size
         self.board_width = 8
         self.grid = self.create_interactive_board()
         self.message_grid = self.create_message_grid()
         self.option_grid = self.create_option_grid()
         self.score_grid = self.create_score_grid()
-        self.label_grid = self.create_label_grid()
+        self.label_grid = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
         self.game_interface = self.create_interface()
 
     def create_interactive_board(self, grid_height=3, grid_width=11):
@@ -176,7 +177,7 @@ class InteractiveGame:
                                          height=f'{4 * 0.4 * self.square_size}px')
 
         for h, w, name in zip([1, 2, 3, 2, 3], [-1, -2, -2, -1, -1], ['scores', 'You', 'TD-Ur', '0', '0']):
-            score_grid[h, w] = make_label(name, css_style="label_font")
+            score_grid[h, w] = make_label(name)
 
         return score_grid
 
@@ -184,8 +185,8 @@ class InteractiveGame:
         label_grid = ipyw.GridspecLayout(1, 11, width=f'{11 * self.square_size}px',
                                          height=f'{0.4 * self.square_size}px')
         for w, name in zip([4, 5, 8], ['start', 'finish', 'roll']):
-            label_grid[0, w] = make_label(name, css_style="label_font")
-        label_grid[0, 9::] = make_label('players', css_style="label_font")
+            label_grid[0, w] = make_label(name)
+        label_grid[0, 9::] = make_label('players')
 
         return label_grid
 
@@ -418,7 +419,27 @@ class InteractiveGame:
         return btn_play
 
 
-def make_empty_grid(cells_high, cells_wide, cell_height, cell_width):
+class Labels:
+    def __init__(self, cell_height, cell_width, cells_high=1, cells_wide=11):
+        self.start_index = 4
+        self.finish_index = 5
+        self.roll_index = 8
+
+        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+
+        grid[0, 9::] = make_label('players')
+
+        grid[0, self.start_index] = make_label('start')
+        grid[0, self.finish_index] = make_label('finish')
+        grid[0, self.roll_index] = make_label('roll')
+
+        return grid
+
+
+def make_empty_grid(cell_height, cell_width, cells_high, cells_wide):
     return ipyw.GridspecLayout(cells_high, cells_wide,
                                width=f'{cells_wide * cell_width}px',
                                height=f'{cells_high * cell_height}px')
