@@ -100,7 +100,7 @@ class InteractiveGame:
         self.square_size = 88
         self.cell_height = 0.4 * self.square_size
         self.board_width = 8
-        self.grid = self.create_interactive_board()
+        self.board = Board(self, self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=8)
         self.roll = Roll(self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=1)
         self.players = Players(self, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=2)
         self.messages = Messages(cell_height=4/3 * self.cell_height, cell_width=self.square_size, cells_high=3, cells_wide=5)
@@ -109,45 +109,10 @@ class InteractiveGame:
         self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
         self.game_interface = self.create_interface()
 
-    def create_interactive_board(self, grid_height=3, grid_width=8):
-        game = self.game
-        board_width = self.board_width
-
-        grid = ipyw.GridspecLayout(grid_height, grid_width,
-                                   height=f'{grid_height * self.square_size}px',
-                                   width=f'{grid_width * self.square_size}px')
-
-        # put play move buttons on all squares
-        for h_display in range(grid_height):
-            for w_display in range(board_width):
-                grid[h_display, w_display] = self.play_move_button(h_display, w_display)
-
-        # add stone count on start and finish squares
-        w_display_start, w_display_finish = 4, 5
-        for i in [0, 2]:
-            for j in [w_display_start, w_display_finish]:
-                grid[i, j].description = f'{game.board[self.transform_to_internal(i, j)]}'
-                grid[i, j].style = {'button_color': color_yellow, 'font_size': '20'}
-                if i == 0:
-                    grid[i, j].add_class("red_font")
-                else:
-                    grid[i, j].add_class("blue_font")
-
-        # disable those on the finish
-        for i in [0, 2]:
-            grid[i, w_display_finish]._click_handlers.callbacks = []
-
-        # add rosettes
-        for i in [0, 1]:
-            for j in game.rosettes:
-                grid[self.transform_to_display(i, j)].add_class("rosette_style")
-
-        return grid
-
     def create_interface(self):
         interface = ipyw.VBox(children=[
             self.labels.grid,
-            ipyw.HBox(children=[self.grid, self.roll.grid, self.players.grid]),
+            ipyw.HBox(children=[self.board.grid, self.roll.grid, self.players.grid]),
             ipyw.HBox(children=[self.options.grid, self.messages.grid, self.scores.grid])])
         interface.add_class("box_style")
         return interface
@@ -158,19 +123,28 @@ class InteractiveGame:
             self.play_and_update(move)
 
     def play_pass(self, button):
-        if 'pass' in self.game.legal_moves():
+        if self.check_turn(human=True) and 'pass' in self.game.legal_moves():
             self.play_and_update('pass')
         else:
             self.messages.display_error("You shall not pass!", "You have a legal move")
 
     def play_agent(self, button):
-        if self.game.has_finished():
-            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
-        elif self.game.turn == self.human:
-            self.messages.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
-        else:
+        if self.check_turn(human=False):
             move = self.agent.policy(self.game, plies=self.search_plies)
             self.play_and_update(move)
+
+    def check_turn(self, human):
+        if self.game.has_finished():
+            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
+            return False
+        if human and self.game.turn != self.human:
+            self.messages.display_error("It's TD-Ur's turn, not yours!", "Click its name to let it make a move.")
+            return False
+        if not human and self.game.turn == self.human:
+            self.messages.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
+            return False
+
+        return True
 
     def play_and_update(self, move):
         """Given a legal move, this plays it on the internal board, and updates all affected buttons."""
@@ -181,14 +155,10 @@ class InteractiveGame:
         else:
             turn = game.turn
             rolled = game.rolled
-            _, w_display_before = self.transform_to_display(turn, move)
-            _, w_display = self.transform_to_display(turn, move + rolled)
+
             game.play_move(move)
 
-            for h_display in range(3):
-                self.update_board_square(h_display, w_display, turn)
-                self.update_board_square(h_display, w_display_before, turn)
-            self.update_starts()
+            self.board.update_affected_squares(turn, move, rolled)
 
             if game.has_finished():
                 self.scores.update(game.winner, self.human)
@@ -202,43 +172,26 @@ class InteractiveGame:
 
         self.do_auto_play()
 
-    def update_starts(self):
-        for h_display in [0, 2]:
-            self.update_board_square(h_display, 4, 0)
-
-    def update_board_square(self, h_display, w_display, turn):
-        """Updates button color/number, after the internal board has been updated, but with the turn argument
-        being the turn before it was updated, so the identity of the player who last moved.
-        """
-        game = self.game
-
-        button = self.grid[h_display, w_display]
-
-        h, w = button.coords
-        board_val = game.board[h, w]
-
-        # for start and finish square, updated displayed number
-        if w == game.start or w == game.finish:
-            button.description = f'{board_val}'
-
-        # for squares on the board, update color
+    def start_new_game(self, button):
+        if self.game.winner == -1:
+            self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
         else:
-            if self.game.mid_start <= w < self.game.mid_ended:
-                if game.board[0, w]:
-                    color = color_red
-                elif game.board[1, w]:
-                    color = color_blue
-                else:
-                    color = 'white'
-            else:
-                if board_val == 0:
-                    color = 'white'
-                elif h_display == 1:
-                    color = [color_red, color_blue][turn]
-                else:
-                    color = [color_red, color_blue][h]
+            self.game.reset()
+            self.human = (self.human + 1) % 2
+            self.update()
+            if self.options.auto_play:
+                self.do_auto_play()
 
-            button.style = {'button_color': color}
+    def update(self):
+        self.roll.update()
+        self.players.update()
+        self.messages.clear()
+        self.board.update()
+
+    def do_auto_play(self):
+        while self.options.auto_play and self.game.turn != self.human and not self.game.has_finished():
+            time.sleep(1)
+            self.play_agent(self.board.grid[2, -1])  # TODO: this one is confusing
 
     def handle_move_errors(self, move):
         game = self.game
@@ -270,23 +223,111 @@ class InteractiveGame:
 
         return is_legal
 
-    def start_new_game(self, button):
-        if self.game.winner == -1:
-            self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
-        else:
-            self.game.reset()
-            self.human = (self.human + 1) % 2
-            self.update_all_buttons()
-            if self.options.auto_play:
-                self.do_auto_play()
 
-    def update_all_buttons(self):
-        self.roll.update()
-        self.players.update()
-        self.messages.clear()
-        for i in range(3):
-            for j in range(self.game.display_width):
-                self.update_board_square(i, j, 0)
+class Board:
+    def __init__(self, interface, game, cell_height, cell_width, cells_high, cells_wide):
+        self.interface = interface
+        self.game = game
+
+        self.board_height = cells_high
+        self.board_width = cells_wide
+
+        self.w_display_start = self.transform_to_display(0, game.start)[1]
+        self.w_display_finish = self.transform_to_display(0, game.finish)[1]
+
+        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+
+        game = self.game
+        board_width = self.board_width
+        board_height = self.board_height
+
+        # put play move buttons on all squares
+        for h_display in range(board_height):
+            for w_display in range(board_width):
+                grid[h_display, w_display] = self.make_play_move_button(h_display, w_display)
+
+        # add stone count on start and finish squares
+        for i in [0, 2]:
+            for j in [self.w_display_start, self.w_display_finish]:
+                grid[i, j].description = f'{game.board[self.transform_to_internal(i, j)]}'
+                grid[i, j].style = {'button_color': color_yellow, 'font_size': '20'}
+                if i == 0:
+                    grid[i, j].add_class("red_font")
+                else:
+                    grid[i, j].add_class("blue_font")
+
+        # disable those on the finish
+        for h_display in [0, 2]:
+            grid[h_display, self.w_display_finish]._click_handlers.callbacks = []
+
+        # add rosettes
+        for h in [0, 1]:
+            for w in game.rosettes:
+                grid[self.transform_to_display(h, w)].add_class("rosette_style")
+
+        return grid
+
+    def update(self):
+        for h_display in range(self.board_height):
+            for w_display in range(self.board_width):
+                self.update_square(h_display, w_display)
+
+    def update_affected_squares(self, turn, move, rolled):
+        _, w_display_before = self.transform_to_display(turn, move)
+        _, w_display = self.transform_to_display(turn, move + rolled)
+
+        for h_display in range(self.board_height):
+            self.update_square(h_display, w_display)
+            self.update_square(h_display, w_display_before)
+        self.update_starts()
+
+    def update_starts(self):
+        for h_display in [0, 2]:
+            self.update_square(h_display, self.w_display_start)
+
+    def update_square(self, h_display, w_display):
+        """Updates button color/number, after the internal board has been updated, but with the turn argument
+        being the turn before it was updated, so the identity of the player who last moved.
+        """
+        game = self.game
+
+        button = self.grid[h_display, w_display]
+
+        h, w = button.coords
+        board_val = game.board[h, w]
+
+        # for start and finish square, updated displayed number
+        if w == game.start or w == game.finish:
+            button.description = f'{board_val}'
+
+        # for squares on the board, update color
+        else:
+            if self.game.mid_start <= w < self.game.mid_ended:
+                if game.board[0, w]:
+                    color = color_red
+                elif game.board[1, w]:
+                    color = color_blue
+                else:
+                    color = 'white'
+            else:
+                if board_val == 0:
+                    color = 'white'
+                elif h_display == 1:
+                    color = [color_red, color_blue][game.turn]
+                else:
+                    color = [color_red, color_blue][h]
+
+            button.style = {'button_color': color}
+
+    def make_play_move_button(self, h_display, w_display):
+        h, w = self.transform_to_internal(h_display, w_display)
+        btn_play = make_button('', 'white', action=partial(self.interface.play_move, move=w))
+        btn_play.display_coords = (h_display, w_display)
+        btn_play.coords = h, w
+        return btn_play
 
     def transform_to_display(self, i, j):
         """Go from internal board representation coordinates (2x16) to displayed board (3x8) coordinates"""
@@ -315,18 +356,6 @@ class InteractiveGame:
                 j_internal = self.game.mid_ended - (j - (self.game.display_width - 1))
 
         return i_internal, j_internal
-
-    def do_auto_play(self):
-        while self.options.auto_play and self.game.turn != self.human and not self.game.has_finished():
-            time.sleep(1)
-            self.play_agent(self.grid[2, -1])
-
-    def play_move_button(self, h_display, w_display):
-        h, w = self.transform_to_internal(h_display, w_display)
-        btn_play = make_button('', 'white', action=partial(self.play_move, move=w))
-        btn_play.display_coords = (h_display, w_display)
-        btn_play.coords = h, w
-        return btn_play
 
 
 class Roll:
