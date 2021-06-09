@@ -101,13 +101,15 @@ class InteractiveGame:
         self.cell_height = 0.4 * self.square_size
         self.board_width = 8
         self.grid = self.create_interactive_board()
+        self.roll = Roll(self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=1)
+        self.players = Players(self, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=2)
         self.messages = Messages(cell_height=4/3 * self.cell_height, cell_width=self.square_size, cells_high=3, cells_wide=5)
         self.options = Options(self, cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
         self.scores = Scores(cell_height=self.cell_height, cell_width=1.5 * self.square_size, cells_high=4, cells_wide=2)
         self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
         self.game_interface = self.create_interface()
 
-    def create_interactive_board(self, grid_height=3, grid_width=11):
+    def create_interactive_board(self, grid_height=3, grid_width=8):
         game = self.game
         board_width = self.board_width
 
@@ -140,22 +142,12 @@ class InteractiveGame:
             for j in game.rosettes:
                 grid[self.transform_to_display(i, j)].add_class("rosette_style")
 
-        # add roll and turn info
-        grid[0, board_width] = make_button(f'{game.rolled}', color_yellow, css_style="red_font")
-        grid[2, board_width] = make_button('', color_yellow, css_style="blue_font")
-
-        # add player info
-        grid[0, board_width + 1:] = make_button('You', color_yellow, css_style="red_font_small",
-                                                action=self.play_pass)
-        grid[2, board_width + 1:] = make_button('TD-Ur', color_yellow, css_style="blue_font_small",
-                                                action=self.play_agent)
-
         return grid
 
     def create_interface(self):
         interface = ipyw.VBox(children=[
             self.labels.grid,
-            self.grid,
+            ipyw.HBox(children=[self.grid, self.roll.grid, self.players.grid]),
             ipyw.HBox(children=[self.options.grid, self.messages.grid, self.scores.grid])])
         interface.add_class("box_style")
         return interface
@@ -202,7 +194,7 @@ class InteractiveGame:
                 self.scores.update(game.winner, self.human)
                 self.messages.display_result(game.winner, self.human)
 
-        self.update_turn()
+        self.roll.update()
 
         with self.out:
             self.out.clear_output(True)
@@ -210,23 +202,9 @@ class InteractiveGame:
 
         self.do_auto_play()
 
-    def update_turn(self):
-        self.grid[2 * self.game.other(), 8].description = ' '
-        self.grid[2 * self.game.turn, 8].description = f'{self.game.rolled}'
-
     def update_starts(self):
         for h_display in [0, 2]:
             self.update_board_square(h_display, 4, 0)
-
-    def update_players(self):
-        human = self.human
-        ai = (human + 1) % 2
-        w_player = self.game.display_width + 1
-
-        self.grid[2 * human, w_player:] = make_button('You', color_yellow, action=self.play_pass)
-        self.grid[2 * ai, w_player:] = make_button('TD-Ur', color_yellow, action=self.play_agent)
-        self.grid[0, w_player:].add_class("red_font_small")
-        self.grid[2, w_player:].add_class("blue_font_small")
 
     def update_board_square(self, h_display, w_display, turn):
         """Updates button color/number, after the internal board has been updated, but with the turn argument
@@ -303,8 +281,8 @@ class InteractiveGame:
                 self.do_auto_play()
 
     def update_all_buttons(self):
-        self.update_turn()
-        self.update_players()
+        self.roll.update()
+        self.players.update()
         self.messages.clear()
         for i in range(3):
             for j in range(self.game.display_width):
@@ -349,6 +327,46 @@ class InteractiveGame:
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
+
+
+class Roll:
+    def __init__(self, game, cell_height, cell_width, cells_high, cells_wide):
+        self.game = game
+        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+
+        grid[0, 0] = make_button(f'{self.game.rolled}', color_yellow, css_style="red_font")
+        grid[2, 0] = make_button('', color_yellow, css_style="blue_font")
+
+        return grid
+
+    def update(self):
+        self.grid[2 * self.game.other(), 0].description = ' '
+        self.grid[2 * self.game.turn, 0].description = f'{self.game.rolled}'
+
+
+class Players:
+    def __init__(self, interface, cell_height, cell_width, cells_high, cells_wide):
+        self.interface = interface
+        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+        grid[0, :] = make_button('You', color_yellow, css_style="red_font_small", action=self.interface.play_pass)
+        grid[2, :] = make_button('TD-Ur', color_yellow, css_style="blue_font_small", action=self.interface.play_agent)
+
+        return grid
+
+    def update(self):
+        human = self.interface.human
+        ai = (human + 1) % 2
+
+        self.grid[2 * human, :] = make_button('You', color_yellow, action=self.interface.play_pass)
+        self.grid[2 * ai, :] = make_button('TD-Ur', color_yellow, action=self.interface.play_agent)
+        self.grid[0, :].add_class("red_font_small")
+        self.grid[2, :].add_class("blue_font_small")
 
 
 class Options:
