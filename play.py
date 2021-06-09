@@ -142,13 +142,13 @@ class InteractiveGame:
                 grid[self.transform_to_display(i, j)].add_class("rosette_style")
 
         # add roll and turn info
-        grid[0, board_width] = self.make_button(f'{game.rolled}', color_yellow, css_style="red_font")
-        grid[2, board_width] = self.make_button('', color_yellow, css_style="blue_font")
+        grid[0, board_width] = make_button(f'{game.rolled}', color_yellow, css_style="red_font")
+        grid[2, board_width] = make_button('', color_yellow, css_style="blue_font")
 
         # add player info
-        grid[0, board_width + 1:] = self.make_button('You', color_yellow, css_style="red_font_small",
+        grid[0, board_width + 1:] = make_button('You', color_yellow, css_style="red_font_small",
                                                      action=self.play_pass)
-        grid[2, board_width + 1:] = self.make_button('TD-Ur', color_yellow, css_style="blue_font_small",
+        grid[2, board_width + 1:] = make_button('TD-Ur', color_yellow, css_style="blue_font_small",
                                                      action=self.play_agent)
 
         return grid
@@ -156,17 +156,17 @@ class InteractiveGame:
     def create_message_grid(self, message_width=5, message_height=4):
         message_grid = ipyw.GridspecLayout(3, 1, width=f'{5 * self.square_size}px',
                                            height=f'{4 * 0.4 * self.square_size}px')
-        message_grid[1, 0] = self.make_label(' ', css_style="message_style")
-        message_grid[2, 0] = self.make_label(' ', css_style="detailed_message_style")
+        message_grid[1, 0] = make_label(' ', css_style="message_style")
+        message_grid[2, 0] = make_label(' ', css_style="detailed_message_style")
 
         return message_grid
 
     def create_option_grid(self):
         option_grid = ipyw.GridspecLayout(4, 1, width=f'{3 * self.square_size}px',
                                           height=f'{4 * 0.4 * self.square_size}px')
-        option_grid[1, 0] = self.make_button('New Game', color_yellow, css_style="button_font",
+        option_grid[1, 0] = make_button('New Game', color_yellow, css_style="button_font",
                                              action=self.start_new_game)
-        option_grid[3, 0] = self.make_button('auto-play: off', color_yellow, css_style="button_font",
+        option_grid[3, 0] = make_button('auto-play: off', color_yellow, css_style="button_font",
                                              action=self.toggle_auto_play)
 
         return option_grid
@@ -176,7 +176,7 @@ class InteractiveGame:
                                          height=f'{4 * 0.4 * self.square_size}px')
 
         for h, w, name in zip([1, 2, 3, 2, 3], [-1, -2, -2, -1, -1], ['scores', 'You', 'TD-Ur', '0', '0']):
-            score_grid[h, w] = self.make_label(name, css_style="label_font")
+            score_grid[h, w] = make_label(name, css_style="label_font")
 
         return score_grid
 
@@ -184,8 +184,8 @@ class InteractiveGame:
         label_grid = ipyw.GridspecLayout(1, 11, width=f'{11 * self.square_size}px',
                                          height=f'{0.4 * self.square_size}px')
         for w, name in zip([4, 5, 8], ['start', 'finish', 'roll']):
-            label_grid[0, w] = self.make_label(name, css_style="label_font")
-        label_grid[0, 9::] = self.make_label('players', css_style="label_font")
+            label_grid[0, w] = make_label(name, css_style="label_font")
+        label_grid[0, 9::] = make_label('players', css_style="label_font")
 
         return label_grid
 
@@ -260,8 +260,8 @@ class InteractiveGame:
         ai = (human + 1) % 2
         w_player = self.game.display_width + 1
 
-        self.grid[2 * human, w_player:] = self.make_button('You', color_yellow, action=self.play_pass)
-        self.grid[2 * ai, w_player:] = self.make_button('TD-Ur', color_yellow, action=self.play_agent)
+        self.grid[2 * human, w_player:] = make_button('You', color_yellow, action=self.play_pass)
+        self.grid[2 * ai, w_player:] = make_button('TD-Ur', color_yellow, action=self.play_agent)
         self.grid[0, w_player:].add_class("red_font_small")
         self.grid[2, w_player:].add_class("blue_font_small")
 
@@ -412,24 +412,30 @@ class InteractiveGame:
 
     def play_move_button(self, h_display, w_display):
         h, w = self.transform_to_internal(h_display, w_display)
-        btn_play = self.make_button('', 'white', action=partial(self.play_move, move=w))
+        btn_play = make_button('', 'white', action=partial(self.play_move, move=w))
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
 
-    @staticmethod
-    def make_button(description, color, css_style="", action=None):
-        button = ipyw.Button(description=description, style={'button_color': color},
-                             layout=ipyw.Layout(height='auto', width='auto'))
-        if css_style:
-            button.add_class(css_style)
-        if action:
-            button.on_click(action)
-        return button
 
-    @staticmethod
-    def make_label(description, css_style=""):
-        label = ipyw.Label(description, layout=ipyw.Layout(height='auto', width='auto'))
-        if css_style:
-            label.add_class(css_style)
-        return label
+def make_empty_grid(cells_high, cells_wide, cell_height, cell_width):
+    return ipyw.GridspecLayout(cells_high, cells_wide,
+                               width=f'{cells_wide * cell_width}px',
+                               height=f'{cells_high * cell_height}px')
+
+
+def make_button(description, color, css_style="", action=None):
+    button = ipyw.Button(description=description, style={'button_color': color},
+                         layout=ipyw.Layout(height='auto', width='auto'))
+    if css_style:
+        button.add_class(css_style)
+    if action:
+        button.on_click(action)
+    return button
+
+
+def make_label(description, css_style="label_font"):
+    label = ipyw.Label(description, layout=ipyw.Layout(height='auto', width='auto'))
+    if css_style:
+        label.add_class(css_style)
+    return label
