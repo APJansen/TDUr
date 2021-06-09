@@ -95,7 +95,6 @@ class InteractiveGame:
 
         self.human = 0
         self.auto_play = False
-        self.scores = [0, 0]
 
         self.out = ipyw.Output()
 
@@ -105,8 +104,8 @@ class InteractiveGame:
         self.grid = self.create_interactive_board()
         self.message_grid = self.create_message_grid()
         self.option_grid = self.create_option_grid()
-        self.score_grid = self.create_score_grid()
-        self.label_grid = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
+        self.scores = Scores(cell_height=self.cell_height, cell_width=1.5 * self.square_size, cells_high=4, cells_wide=2)
+        self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
         self.game_interface = self.create_interface()
 
     def create_interactive_board(self, grid_height=3, grid_width=11):
@@ -172,29 +171,11 @@ class InteractiveGame:
 
         return option_grid
 
-    def create_score_grid(self):
-        score_grid = ipyw.GridspecLayout(4, 2, width=f'{3 * self.square_size}px',
-                                         height=f'{4 * 0.4 * self.square_size}px')
-
-        for h, w, name in zip([1, 2, 3, 2, 3], [-1, -2, -2, -1, -1], ['scores', 'You', 'TD-Ur', '0', '0']):
-            score_grid[h, w] = make_label(name)
-
-        return score_grid
-
-    def create_label_grid(self):
-        label_grid = ipyw.GridspecLayout(1, 11, width=f'{11 * self.square_size}px',
-                                         height=f'{0.4 * self.square_size}px')
-        for w, name in zip([4, 5, 8], ['start', 'finish', 'roll']):
-            label_grid[0, w] = make_label(name)
-        label_grid[0, 9::] = make_label('players')
-
-        return label_grid
-
     def create_interface(self):
         interface = ipyw.VBox(children=[
-            self.label_grid,
+            self.labels.grid,
             self.grid,
-            ipyw.HBox(children=[self.option_grid, self.message_grid, self.score_grid])])
+            ipyw.HBox(children=[self.option_grid, self.message_grid, self.scores.grid])])
         interface.add_class("box_style")
         return interface
 
@@ -237,7 +218,7 @@ class InteractiveGame:
             self.update_starts()
 
             if game.has_finished():
-                self.update_scores()
+                self.scores.update(game.winner, self.human)
                 self.print_result()
 
         self.update_turn()
@@ -299,15 +280,6 @@ class InteractiveGame:
                     color = [color_red, color_blue][h]
 
             button.style = {'button_color': color}
-
-    def update_scores(self):
-        if self.game.winner == self.human:
-            self.scores[0] += 1
-        else:
-            self.scores[1] += 1
-
-        self.score_grid[2, -1].value = f'{self.scores[0]}'
-        self.score_grid[3, -1].value = f'{self.scores[1]}'
 
     def handle_move_errors(self, move):
         game = self.game
@@ -417,6 +389,39 @@ class InteractiveGame:
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
+
+
+class Scores:
+    def __init__(self, cell_height, cell_width, cells_high, cells_wide):
+        self.header_indices = 1, -1
+        self.player_name_indices = 2, -2
+        self.agent_name_indices = 3, -2
+        self.player_score_indices = 2, -1
+        self.agent_score_indices = 3, -1
+
+        self.values = [0, 0]
+
+        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+
+    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
+        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+
+        grid[self.header_indices] = make_label('scores')
+        grid[self.player_name_indices] = make_label('You')
+        grid[self.agent_name_indices] = make_label('TD-Ur')
+        grid[self.player_score_indices] = make_label('0')
+        grid[self.agent_score_indices] = make_label('0')
+
+        return grid
+
+    def update(self, winner, human):
+        if winner == human:
+            self.values[0] += 1
+        else:
+            self.values[1] += 1
+
+        self.grid[self.player_score_indices].value = f'{self.values[0]}'
+        self.grid[self.player_score_indices].value = f'{self.values[1]}'
 
 
 class Labels:
