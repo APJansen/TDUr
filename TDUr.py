@@ -63,20 +63,31 @@ class TDUr:
         self.params = init_network_params([self.input_units, self.hidden_units, 1], key)
 
     def value(self, board, turn):
-        """
-        Return value as seen from player 0's perspective.
-        Input: board, turn
+        """Return value as seen from player 0's perspective.
 
         Relies on jitted `compute_value`.
+
+        Args:
+            board: A game board, a 2D numpy array of integers.
+            turn: Integer, 0 or 1, indicating whose turn it is.
+
+        Returns:
+            Estimated win probability of player 0.
         """
         return compute_value(self.params, board, turn)
 
     def value_gradient(self, board, turn):
-        """
-        Return the gradient of the value function.
-        Input: agent parameters, board, turn.
+        """Return the gradient of the value function.
 
-        Relies on jitted grad of `compute_value`: `value_grad`."""
+        Relies on jitted grad of `compute_value`: `value_grad`.
+
+        Args:
+            board: A game board, a 2D numpy array of integers.
+            turn: Integer, 0 or 1, indicating whose turn it is.
+
+        Returns:
+            The gradient of the value function, a list of jax.numpy tensors of the same shape as the agent's parameters.
+        """
         return value_grad(self.params, board, turn)
 
     def get_params(self):
@@ -92,31 +103,36 @@ class TDUr:
         self.params = init_network_params([self.input_units, self.hidden_units, 1], self.key)
 
     def save_params(self, name, directory='parameters'):
-        """
-        Save the current agent parameters to a file, pickled.
-        Input: name of the file
+        """Save the current agent parameters to a file, pickled.
+
         Keyword argument: directory='parameters', the subdirectory.
+        Args:
+            name: Name of the file to create.
+            directory: Optional subdirectory to safe to, default `parameters`.
         """
         pickle.dump(self.params, open(os.path.join(directory, name + '.pkl'), "wb"))
 
     def update_params(self, scalar, eligibility):
-        """
-        Update agent parameters.
-        Input:  - a scalar, representing the product of the learning rate and TD-error
-                - the eligibility vector
+        """Update agent parameters.
 
         Relies on jitted `get_new_params`.
+
+        Args:
+            scalar: the product of the learning rate and TD-error.
+            eligibility: The eligibility trace.
         """
         self.params = get_new_params(self.params, scalar, eligibility)
 
     def policy(self, game, plies=1, epsilon=0):
-        """
-        Return the greedy (or epsilon-greedy) move based on the input game's state and the agent's value function.
+        """Return the greedy (or epsilon-greedy) move based on the input game's state and the agent's value function.
 
-        Input: game
-        Keyword arguments:
-                - plies, default to 1, for 2 it does a 2-ply search and bases the policy on the expected values.
-                - epsilon, the chance of playing a random move.
+        Args:
+            game: The game instance to play on.
+            plies: Optional, 1 or 2, how many plies to search, defaults to 1.
+            epsilon: Optional exploration parameter, defaults to 0.
+
+        Returns:
+            The (epsilon-)greedy move, integer.
         """
         moves = game.legal_moves()
         if len(moves) == 1:
@@ -133,9 +149,13 @@ class TDUr:
     def move_values(self, game, moves=False, plies=1):
         """Return afterstate values for moves given.
 
-        Input:  -game
-                -moves: a list of legal moves, or False in which case list is generated (for external use)
-                -plies, default 1 but can be 2, how many ply to search
+        Args:
+            game: The game instance to play on.
+            moves: List of legal moves, or False in which case list is generated (for external use).
+            plies: Optional, 1 or 2, how many plies to search, defaults to 1.
+
+        Returns:
+            List of afterstate values for each of the given moves.
         """
         if moves is False:
             moves = game.legal_moves()

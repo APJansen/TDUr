@@ -143,8 +143,7 @@ class Ur:
         Relies on jitted function `legal_moves_array`.
 
         Returns:
-            list of integers representing legal squares to move from, counted along the route.
-
+            List of integers representing legal squares to move from, counted along the route.
         """
         if self.rolled == 0:
             moves = []
@@ -208,7 +207,6 @@ class Ur:
 
         Returns:
             A game state of the form `(board, turn, rolled, winner, move_count)`.
-
         """
         return self.board.copy(), self.turn, self.rolled, self.winner, self.move_count
 
@@ -217,7 +215,6 @@ class Ur:
 
         Args:
             state: A game state of the form `(board, turn, rolled, winner, move_count)`.
-
         """
         self.board, self.turn, self.rolled, self.winner, self.move_count = state
 
@@ -239,7 +236,6 @@ class Ur:
 
         Returns:
             A list of tuples (board, turn, winner), one for each move.
-
         """
         return get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
 
