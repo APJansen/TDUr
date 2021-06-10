@@ -3,6 +3,7 @@ from game import Ur
 import ipywidgets as ipyw
 from functools import partial
 import time
+from IPython.display import HTML, display
 
 style_string = """
 <style>
@@ -84,10 +85,8 @@ style_string = """
 class InteractiveGame:
     """Class representing the game of Ur, interactively playable against an AI agent.
 
-    Attributes:
-        interface: The actual game.
+    To use, run `play` method in Jupyter/Colab notebook.
     """
-
     def __init__(self, agent_parameters, search_plies=2):
         """Construct an interactive Ur game.
 
@@ -127,6 +126,11 @@ class InteractiveGame:
             ipyw.HBox(children=[self.options.grid, self.messages.grid, self.scores.grid])])
         interface.add_class("box_style")
         return interface
+
+    def play(self):
+        """Show the interface to be able to play the game, in a Jupyter/Colab notebook."""
+        display(HTML(style_string))
+        return self.game_interface
 
     def play_move(self, button, move, h_display):
         """Play the given move in the game, if legal, and update the interface.
