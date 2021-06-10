@@ -80,9 +80,9 @@ style_string = """
 }
 </style>"""
 
-# color_yellow = 'rgb(250,201,1)'
-# color_blue = 'rgb(34,80,149)'
-# color_red = 'rgb(221,1,0)'
+color_yellow = 'rgb(250,201,1)'
+color_blue = 'rgb(34,80,149)'
+color_red = 'rgb(221,1,0)'
 
 
 class InteractiveGame:
@@ -97,16 +97,19 @@ class InteractiveGame:
 
         self.out = ipyw.Output()
 
-        self.square_size = 88
-        self.cell_height = 0.4 * self.square_size
+        self.cell_width = 88
+        self.cell_height = 0.4 * self.cell_width
+        self.style = {'red': 'rgb(221,1,0)', 'blue': 'rgb(34,80,149)', 'yellow': 'rgb(250,201,1)',
+                      'cell_width': 88, 'cell_height': 0.4 * 88}
 
-        self.board = Board(self, self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=8)
-        self.roll = Roll(self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=1)
-        self.players = Players(self, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=2)
-        self.messages = Messages(cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=5)
-        self.options = Options(self, cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
-        self.scores = Scores(cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
-        self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
+        self.board = Board(self, self.game, style=self.style)
+        self.roll = Roll(self.game, style=self.style)
+        self.players = Players(self, style=self.style)
+        self.messages = Messages(style=self.style)
+        self.options = Options(self, style=self.style)
+        self.scores = Scores(style=self.style)
+        self.labels = Labels(style=self.style)
+
         self.game_interface = self.create_interface()
 
     def create_interface(self):
@@ -223,7 +226,7 @@ class InteractiveGame:
 
 
 class Board:
-    def __init__(self, interface, game, cell_height, cell_width, cells_high, cells_wide):
+    def __init__(self, interface, game, style, cells_high=3, cells_wide=8):
         self.interface = interface
         self.game = game
 
@@ -233,12 +236,12 @@ class Board:
         self.w_display_start = self.transform_to_display(0, game.start)[1]
         self.w_display_finish = self.transform_to_display(0, game.finish)[1]
 
-        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
+        self.init_grid()
 
-    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
-
+    def init_grid(self):
         game = self.game
+        grid = self.grid
         board_width = self.board_width
         board_height = self.board_height
 
@@ -265,8 +268,6 @@ class Board:
         for h in [0, 1]:
             for w in game.rosettes:
                 grid[self.transform_to_display(h, w)].add_class("rosette_style")
-
-        return grid
 
     def update(self):
         for h_display in range(self.board_height):
@@ -357,17 +358,14 @@ class Board:
 
 
 class Roll:
-    def __init__(self, game, cell_height, cell_width, cells_high, cells_wide):
+    def __init__(self, game, style, cells_high=3, cells_wide=1):
         self.game = game
-        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
+        self.init_grid()
 
-    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
-
-        grid[0, 0] = make_button(f'{self.game.rolled}', color_yellow, css_style="red_font")
-        grid[2, 0] = make_button('', color_yellow, css_style="blue_font")
-
-        return grid
+    def init_grid(self):
+        self.grid[0, 0] = make_button(f'{self.game.rolled}', color_yellow, css_style="red_font")
+        self.grid[2, 0] = make_button('', color_yellow, css_style="blue_font")
 
     def update(self):
         self.grid[2 * self.game.other(), 0].description = ' '
@@ -375,16 +373,14 @@ class Roll:
 
 
 class Players:
-    def __init__(self, interface, cell_height, cell_width, cells_high, cells_wide):
+    def __init__(self, interface, style, cells_high=3, cells_wide=2):
         self.interface = interface
-        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
+        self.init_grid()
 
-    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
-        grid[0, :] = make_button('You', color_yellow, css_style="red_font_small", action=self.interface.play_pass)
-        grid[2, :] = make_button('TD-Ur', color_yellow, css_style="blue_font_small", action=self.interface.play_agent)
-
-        return grid
+    def init_grid(self):
+        self.grid[0, :] = make_button('You', color_yellow, css_style="red_font_small", action=self.interface.play_pass)
+        self.grid[2, :] = make_button('TD-Ur', color_yellow, css_style="blue_font_small", action=self.interface.play_agent)
 
     def update(self):
         human = self.interface.human
@@ -397,24 +393,21 @@ class Players:
 
 
 class Options:
-    def __init__(self, interface, cell_height, cell_width, cells_high, cells_wide):
+    def __init__(self, interface, style, cells_high=4, cells_wide=3):
         self.new_game_index = 1
         self.auto_play_index = 3
         self.interface = interface
 
         self.auto_play = False
 
-        self.grid = self.make_grid(interface, cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide)
+        self.init_grid()
 
-    def make_grid(self, interface, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
-
-        grid[self.new_game_index, :] = make_button('New Game', color_yellow, css_style="button_font",
-                                                   action=interface.start_new_game)
-        grid[self.auto_play_index, :] = make_button('auto-play: off', color_yellow, css_style="button_font",
-                                                    action=self.toggle_auto_play)
-
-        return grid
+    def init_grid(self):
+        self.grid[self.new_game_index, :] = make_button('New Game', color_yellow, css_style="button_font",
+                                                        action=self.interface.start_new_game)
+        self.grid[self.auto_play_index, :] = make_button('auto-play: off', color_yellow, css_style="button_font",
+                                                         action=self.toggle_auto_play)
 
     def toggle_auto_play(self, button):
         if self.auto_play:
@@ -427,25 +420,22 @@ class Options:
 
 
 class Scores:
-    def __init__(self, cell_height, cell_width, cells_high, cells_wide):
+    def __init__(self, style, cells_high=4, cells_wide=3):
         self.header_h = 1
         self.player_h = 2
         self.agent_h = 3
 
         self.values = [0, 0]
 
-        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide)
+        self.init_grid()
 
-    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
-
-        grid[self.header_h, :] = make_label('scores')
-        grid[self.player_h, :-1] = make_label('You')
-        grid[self.agent_h, :-1] = make_label('TD-Ur')
-        grid[self.player_h, -1] = make_label('0')
-        grid[self.agent_h, -1] = make_label('0')
-
-        return grid
+    def init_grid(self):
+        self.grid[self.header_h, :] = make_label('scores')
+        self.grid[self.player_h, :-1] = make_label('You')
+        self.grid[self.agent_h, :-1] = make_label('TD-Ur')
+        self.grid[self.player_h, -1] = make_label('0')
+        self.grid[self.agent_h, -1] = make_label('0')
 
     def update(self, winner, human):
         if winner == human:
@@ -458,18 +448,15 @@ class Scores:
 
 
 class Messages:
-    def __init__(self, cell_height, cell_width, cells_high, cells_wide):
+    def __init__(self, style, cells_high=4, cells_wide=5):
         self.main_index = 1
         self.detail_index = 2
-        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide)
+        self.init_grid()
 
-    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
-
-        grid[self.main_index, :] = make_label(' ', css_style="message_style")
-        grid[self.detail_index, :] = make_label(' ', css_style="detailed_message_style")
-
-        return grid
+    def init_grid(self):
+        self.grid[self.main_index, :] = make_label(' ', css_style="message_style")
+        self.grid[self.detail_index, :] = make_label(' ', css_style="detailed_message_style")
 
     def display_error(self, message, details):
         self.grid[self.main_index, :].value = message
@@ -487,26 +474,25 @@ class Messages:
 
 
 class Labels:
-    def __init__(self, cell_height, cell_width, cells_high=1, cells_wide=11):
+    def __init__(self, style, cells_high=1, cells_wide=11):
         self.start_index = 4
         self.finish_index = 5
         self.roll_index = 8
 
-        self.grid = self.make_grid(cell_height, cell_width, cells_high, cells_wide)
+        self.grid = make_empty_grid(style, cells_high, cells_wide)
+        self.init_grid()
 
-    def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
-        grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
+    def init_grid(self):
+        self.grid[0, 9::] = make_label('players')
 
-        grid[0, 9::] = make_label('players')
-
-        grid[0, self.start_index] = make_label('start')
-        grid[0, self.finish_index] = make_label('finish')
-        grid[0, self.roll_index] = make_label('roll')
-
-        return grid
+        self.grid[0, self.start_index] = make_label('start')
+        self.grid[0, self.finish_index] = make_label('finish')
+        self.grid[0, self.roll_index] = make_label('roll')
 
 
-def make_empty_grid(cell_height, cell_width, cells_high, cells_wide):
+def make_empty_grid(style, cells_high, cells_wide, square=False):
+    cell_width = style['cell_width']
+    cell_height = cell_width if square else style['cell_height']
     return ipyw.GridspecLayout(cells_high, cells_wide,
                                width=f'{cells_wide * cell_width}px',
                                height=f'{cells_high * cell_height}px')
