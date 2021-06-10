@@ -80,9 +80,9 @@ style_string = """
 }
 </style>"""
 
-color_yellow = 'rgb(250,201,1)'
-color_blue = 'rgb(34,80,149)'
-color_red = 'rgb(221,1,0)'
+# color_yellow = 'rgb(250,201,1)'
+# color_blue = 'rgb(34,80,149)'
+# color_red = 'rgb(221,1,0)'
 
 
 class InteractiveGame:
@@ -103,9 +103,9 @@ class InteractiveGame:
         self.board = Board(self, self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=8)
         self.roll = Roll(self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=1)
         self.players = Players(self, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=2)
-        self.messages = Messages(cell_height=4/3 * self.cell_height, cell_width=self.square_size, cells_high=3, cells_wide=5)
+        self.messages = Messages(cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=5)
         self.options = Options(self, cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
-        self.scores = Scores(cell_height=self.cell_height, cell_width=1.5 * self.square_size, cells_high=4, cells_wide=2)
+        self.scores = Scores(cell_height=self.cell_height, cell_width=self.square_size, cells_high=4, cells_wide=3)
         self.labels = Labels(cell_height=self.cell_height, cell_width=self.square_size, cells_high=1, cells_wide=11)
         self.game_interface = self.create_interface()
 
@@ -428,11 +428,9 @@ class Options:
 
 class Scores:
     def __init__(self, cell_height, cell_width, cells_high, cells_wide):
-        self.header_indices = 1, -1
-        self.player_name_indices = 2, -2
-        self.agent_name_indices = 3, -2
-        self.player_score_indices = 2, -1
-        self.agent_score_indices = 3, -1
+        self.header_h = 1
+        self.player_h = 2
+        self.agent_h = 3
 
         self.values = [0, 0]
 
@@ -441,11 +439,11 @@ class Scores:
     def make_grid(self, cell_height, cell_width, cells_high, cells_wide):
         grid = make_empty_grid(cell_height, cell_width, cells_high, cells_wide)
 
-        grid[self.header_indices] = make_label('scores')
-        grid[self.player_name_indices] = make_label('You')
-        grid[self.agent_name_indices] = make_label('TD-Ur')
-        grid[self.player_score_indices] = make_label('0')
-        grid[self.agent_score_indices] = make_label('0')
+        grid[self.header_h, :] = make_label('scores')
+        grid[self.player_h, :-1] = make_label('You')
+        grid[self.agent_h, :-1] = make_label('TD-Ur')
+        grid[self.player_h, -1] = make_label('0')
+        grid[self.agent_h, -1] = make_label('0')
 
         return grid
 
@@ -455,8 +453,8 @@ class Scores:
         else:
             self.values[1] += 1
 
-        self.grid[self.player_score_indices].value = f'{self.values[0]}'
-        self.grid[self.player_score_indices].value = f'{self.values[1]}'
+        self.grid[self.player_h, -1].value = f'{self.values[0]}'
+        self.grid[self.agent_h, -1].value = f'{self.values[1]}'
 
 
 class Messages:
