@@ -99,7 +99,7 @@ class InteractiveGame:
 
         self.square_size = 88
         self.cell_height = 0.4 * self.square_size
-        self.board_width = 8
+
         self.board = Board(self, self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=8)
         self.roll = Roll(self.game, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=1)
         self.players = Players(self, cell_height=self.square_size, cell_width=self.square_size, cells_high=3, cells_wide=2)
@@ -117,34 +117,21 @@ class InteractiveGame:
         interface.add_class("box_style")
         return interface
 
-    def play_move(self, button, move):
-        is_legal_move = self.handle_move_errors(move)
+    def play_move(self, button, move, h_display):
+        is_legal_move = self.handle_move_errors(move, h_display)
         if is_legal_move:
             self.play_and_update(move)
 
     def play_pass(self, button):
-        if self.check_turn(human=True) and 'pass' in self.game.legal_moves():
+        if self.check_turn(is_human=True) and 'pass' in self.game.legal_moves():
             self.play_and_update('pass')
         else:
             self.messages.display_error("You shall not pass!", "You have a legal move")
 
     def play_agent(self, button):
-        if self.check_turn(human=False):
+        if self.check_turn(is_human=False):
             move = self.agent.policy(self.game, plies=self.search_plies)
             self.play_and_update(move)
-
-    def check_turn(self, human):
-        if self.game.has_finished():
-            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
-            return False
-        if human and self.game.turn != self.human:
-            self.messages.display_error("It's TD-Ur's turn, not yours!", "Click its name to let it make a move.")
-            return False
-        if not human and self.game.turn == self.human:
-            self.messages.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
-            return False
-
-        return True
 
     def play_and_update(self, move):
         """Given a legal move, this plays it on the internal board, and updates all affected buttons."""
@@ -193,22 +180,20 @@ class InteractiveGame:
             time.sleep(1)
             self.play_agent(self.board.grid[2, -1])  # TODO: this one is confusing
 
-    def handle_move_errors(self, move):
+    def handle_move_errors(self, move, h_display):
         game = self.game
-        is_legal = True
 
-        if game.has_finished():
+        if not self.check_turn(is_human=True):
+            return False
+
+        is_legal = True
+        if h_display == 2 * ((self.game.turn + 1) % 2):
             is_legal = False
-            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
-            return is_legal
-        elif game.turn != self.human:
-            is_legal = False
-            self.messages.display_error("It's TD-Ur's turn!", "Click its name to let it make a move.")
-            return is_legal
+            self.messages.display_error("That's not your own row!", "See on the right which color you are.")
         elif move not in game.legal_moves():
             is_legal = False
             if game.board[game.turn, move] == 0:
-                reason = "No stone present to move."
+                reason = "No own stone present to move."
             elif move + game.rolled > self.game.finish:
                 reason = "This would move the stone off the board."
             elif game.board[game.turn, move + game.rolled] == 1:
@@ -222,6 +207,19 @@ class InteractiveGame:
             self.messages.display_error("Not a legal move!", reason)
 
         return is_legal
+
+    def check_turn(self, is_human):
+        if self.game.has_finished():
+            self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
+            return False
+        if is_human and self.game.turn != self.human:
+            self.messages.display_error("It's TD-Ur's turn, not yours!", "Click its name to let it make a move.")
+            return False
+        if not is_human and self.game.turn == self.human:
+            self.messages.display_error("It's your turn, not TD-Ur's!", "Click the square you want to move.")
+            return False
+
+        return True
 
 
 class Board:
@@ -324,7 +322,7 @@ class Board:
 
     def make_play_move_button(self, h_display, w_display):
         h, w = self.transform_to_internal(h_display, w_display)
-        btn_play = make_button('', 'white', action=partial(self.interface.play_move, move=w))
+        btn_play = make_button('', 'white', action=partial(self.interface.play_move, move=w, h_display=h_display))
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
