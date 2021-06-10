@@ -80,10 +80,6 @@ style_string = """
 }
 </style>"""
 
-color_yellow = 'rgb(250,201,1)'
-color_blue = 'rgb(34,80,149)'
-color_red = 'rgb(221,1,0)'
-
 
 class InteractiveGame:
 
@@ -229,6 +225,7 @@ class Board:
     def __init__(self, interface, game, style, cells_high=3, cells_wide=8):
         self.interface = interface
         self.game = game
+        self.style = style
 
         self.board_height = cells_high
         self.board_width = cells_wide
@@ -254,7 +251,7 @@ class Board:
         for i in [0, 2]:
             for j in [self.w_display_start, self.w_display_finish]:
                 grid[i, j].description = f'{game.board[self.transform_to_internal(i, j)]}'
-                grid[i, j].style = {'button_color': color_yellow, 'font_size': '20'}
+                grid[i, j].style = {'button_color': self.style['yellow'], 'font_size': '20'}
                 if i == 0:
                     grid[i, j].add_class("red_font")
                 else:
@@ -304,20 +301,21 @@ class Board:
 
         # for squares on the board, update color
         else:
+            red, blue = self.style['red'], self.style['blue']
             if self.game.mid_start <= w < self.game.mid_ended:
                 if game.board[0, w]:
-                    color = color_red
+                    color = red
                 elif game.board[1, w]:
-                    color = color_blue
+                    color = blue
                 else:
                     color = 'white'
             else:
                 if board_val == 0:
                     color = 'white'
                 elif h_display == 1:
-                    color = [color_red, color_blue][game.turn]
+                    color = [red, blue][game.turn]
                 else:
-                    color = [color_red, color_blue][h]
+                    color = [red, blue][h]
 
             button.style = {'button_color': color}
 
@@ -360,12 +358,13 @@ class Board:
 class Roll:
     def __init__(self, game, style, cells_high=3, cells_wide=1):
         self.game = game
+        self.style = style
         self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
         self.init_grid()
 
     def init_grid(self):
-        self.grid[0, 0] = make_button(f'{self.game.rolled}', color_yellow, css_style="red_font")
-        self.grid[2, 0] = make_button('', color_yellow, css_style="blue_font")
+        self.grid[0, 0] = make_button(f'{self.game.rolled}', self.style['yellow'], css_style="red_font")
+        self.grid[2, 0] = make_button('', self.style['yellow'], css_style="blue_font")
 
     def update(self):
         self.grid[2 * self.game.other(), 0].description = ' '
@@ -375,28 +374,30 @@ class Roll:
 class Players:
     def __init__(self, interface, style, cells_high=3, cells_wide=2):
         self.interface = interface
+        self.style = style
         self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
         self.init_grid()
 
     def init_grid(self):
-        self.grid[0, :] = make_button('You', color_yellow, css_style="red_font_small", action=self.interface.play_pass)
-        self.grid[2, :] = make_button('TD-Ur', color_yellow, css_style="blue_font_small", action=self.interface.play_agent)
+        self.grid[0, :] = make_button('You', self.style['yellow'], css_style="red_font_small", action=self.interface.play_pass)
+        self.grid[2, :] = make_button('TD-Ur', self.style['yellow'], css_style="blue_font_small", action=self.interface.play_agent)
 
     def update(self):
         human = self.interface.human
         ai = (human + 1) % 2
 
-        self.grid[2 * human, :] = make_button('You', color_yellow, action=self.interface.play_pass)
-        self.grid[2 * ai, :] = make_button('TD-Ur', color_yellow, action=self.interface.play_agent)
+        self.grid[2 * human, :] = make_button('You', self.style['yellow'], action=self.interface.play_pass)
+        self.grid[2 * ai, :] = make_button('TD-Ur', self.style['yellow'], action=self.interface.play_agent)
         self.grid[0, :].add_class("red_font_small")
         self.grid[2, :].add_class("blue_font_small")
 
 
 class Options:
     def __init__(self, interface, style, cells_high=4, cells_wide=3):
+        self.style = style
+        self.interface = interface
         self.new_game_index = 1
         self.auto_play_index = 3
-        self.interface = interface
 
         self.auto_play = False
 
@@ -404,9 +405,9 @@ class Options:
         self.init_grid()
 
     def init_grid(self):
-        self.grid[self.new_game_index, :] = make_button('New Game', color_yellow, css_style="button_font",
+        self.grid[self.new_game_index, :] = make_button('New Game', self.style['yellow'], css_style="button_font",
                                                         action=self.interface.start_new_game)
-        self.grid[self.auto_play_index, :] = make_button('auto-play: off', color_yellow, css_style="button_font",
+        self.grid[self.auto_play_index, :] = make_button('auto-play: off', self.style['yellow'], css_style="button_font",
                                                          action=self.toggle_auto_play)
 
     def toggle_auto_play(self, button):
