@@ -44,14 +44,35 @@ def get_new_params(params, scalar, eligibility):
     return [(w + scalar * z_w, b + scalar * z_b) for (w, b), (z_w, z_b) in zip(params, eligibility)]
 
 
-def random_layer_params(m, n, key, scale=1e-2):
+# def random_layer_params(m, n, key, scale=1e-2):
+#     w_key, b_key = random.split(key)
+#     return scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
+#
+#
+# def init_network_params(sizes, key):
+#     keys = random.split(key, len(sizes))
+#     return [random_layer_params(m, n, k) for m, n, k in zip(sizes[:-1], sizes[1:], keys)]
+
+
+def random_layer_params(n_in, n_out, key, activation):
     w_key, b_key = random.split(key)
-    return scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
+    if activation == 'sigmoid':
+        scale = jnp.sqrt(1 / n_in)
+        weights = scale * random.normal(w_key, (n_out, n_in))
+        biases = jnp.zeros(shape=(n_out,))
+    else:  # activation == 'relu'
+        scale = jnp.sqrt(2 / n_in)
+        weights = scale * random.normal(w_key, (n_out, n_in))
+        biases = jnp.zeros(shape=(n_out,)) + 0.1
+
+    return weights, biases
 
 
-def init_network_params(sizes, key):
-    keys = random.split(key, len(sizes))
-    return [random_layer_params(m, n, k) for m, n, k in zip(sizes[:-1], sizes[1:], keys)]
+def init_network_params(n_in, n_hidden, n_out, key):
+    keys = random.split(key, 2)
+    layer_1 = random_layer_params(n_in=n_in, n_out=n_hidden, key=keys[0], activation='relu')
+    layer_2 = random_layer_params(n_in=n_hidden, n_out=n_out, key=keys[1], activation='sigmoid')
+    return [layer_1, layer_2]
 
 
 class TDUr:
@@ -60,7 +81,7 @@ class TDUr:
         self.input_units = 32
         self.hidden_units = hidden_units
         self.key = key
-        self.params = init_network_params([self.input_units, self.hidden_units, 1], key)
+        self.params = init_network_params(self.input_units, self.hidden_units, 1, key)
 
     def value(self, board, turn):
         """Return value as seen from player 0's perspective.
@@ -100,7 +121,7 @@ class TDUr:
 
     def init_params(self):
         """Initialize parameters."""
-        self.params = init_network_params([self.input_units, self.hidden_units, 1], self.key)
+        self.params = init_network_params(self.input_units, self.hidden_units, 1, self.key)
 
     def save_params(self, name, directory='parameters'):
         """Save the current agent parameters to a file, pickled.
