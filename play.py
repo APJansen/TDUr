@@ -96,7 +96,7 @@ class InteractiveGame:
         self.cell_width = 88
         self.cell_height = 0.4 * self.cell_width
         self.style = {'red': 'rgb(221,1,0)', 'blue': 'rgb(34,80,149)', 'yellow': 'rgb(250,201,1)',
-                      'cell_width': 88, 'cell_height': 0.4 * 88}
+                      'cell_width': self.cell_width, 'cell_height': self.cell_height}
 
         self.board = Board(self, self.game, style=self.style)
         self.roll = Roll(self.game, style=self.style)
@@ -106,9 +106,9 @@ class InteractiveGame:
         self.scores = Scores(style=self.style)
         self.labels = Labels(style=self.style)
 
-        self.game_interface = self.create_interface()
+        self.game_interface = self._create_interface()
 
-    def create_interface(self):
+    def _create_interface(self):
         interface = ipyw.VBox(children=[
             self.labels.grid,
             ipyw.HBox(children=[self.board.grid, self.roll.grid, self.players.grid]),
@@ -117,22 +117,22 @@ class InteractiveGame:
         return interface
 
     def play_move(self, button, move, h_display):
-        is_legal_move = self.handle_move_errors(move, h_display)
+        is_legal_move = self._handle_move_errors(move, h_display)
         if is_legal_move:
-            self.play_and_update(move)
+            self._play_and_update(move)
 
     def play_pass(self, button):
-        if self.check_turn(is_human=True) and 'pass' in self.game.legal_moves():
-            self.play_and_update('pass')
+        if self._check_turn(is_human=True) and 'pass' in self.game.legal_moves():
+            self._play_and_update('pass')
         else:
             self.messages.display_error("You shall not pass!", "You have a legal move")
 
     def play_agent(self, button):
-        if self.check_turn(is_human=False):
+        if self._check_turn(is_human=False):
             move = self.agent.policy(self.game, plies=self.search_plies)
-            self.play_and_update(move)
+            self._play_and_update(move)
 
-    def play_and_update(self, move):
+    def _play_and_update(self, move):
         """Given a legal move, this plays it on the internal board, and updates all affected buttons."""
         game = self.game
         self.messages.clear()
@@ -156,17 +156,17 @@ class InteractiveGame:
             self.out.clear_output(True)
             ipyw.widgets.interaction.show_inline_matplotlib_plots()
 
-        self.do_auto_play()
+        self._do_auto_play()
 
     def start_new_game(self, button):
-        if self.game.winner == -1:
+        if not self.game.has_finished():
             self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
         else:
             self.game.reset()
             self.human = (self.human + 1) % 2
             self.update()
             if self.options.auto_play:
-                self.do_auto_play()
+                self._do_auto_play()
 
     def update(self):
         self.roll.update()
@@ -174,15 +174,18 @@ class InteractiveGame:
         self.messages.clear()
         self.board.update()
 
-    def do_auto_play(self):
+    def _do_auto_play(self):
         while self.options.auto_play and self.game.turn != self.human and not self.game.has_finished():
             time.sleep(1)
-            self.play_agent(self.board.grid[2, -1])  # TODO: this one is confusing
+            # ipywidget actions have to take the button itself as argument, but none of the actions here depend on it
+            # so need a dummy argument here
+            dummy_button = 0
+            self.play_agent(dummy_button)
 
-    def handle_move_errors(self, move, h_display):
+    def _handle_move_errors(self, move, h_display):
         game = self.game
 
-        if not self.check_turn(is_human=True):
+        if not self._check_turn(is_human=True):
             return False
 
         is_legal = True
@@ -207,7 +210,7 @@ class InteractiveGame:
 
         return is_legal
 
-    def check_turn(self, is_human):
+    def _check_turn(self, is_human):
         if self.game.has_finished():
             self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
             return False
@@ -230,13 +233,13 @@ class Board:
         self.board_height = cells_high
         self.board_width = cells_wide
 
-        self.w_display_start = self.transform_to_display(0, game.start)[1]
-        self.w_display_finish = self.transform_to_display(0, game.finish)[1]
+        self.w_display_start = self._transform_to_display(0, game.start)[1]
+        self.w_display_finish = self._transform_to_display(0, game.finish)[1]
 
         self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
+    def _init_grid(self):
         game = self.game
         grid = self.grid
         board_width = self.board_width
@@ -245,12 +248,12 @@ class Board:
         # put play move buttons on all squares
         for h_display in range(board_height):
             for w_display in range(board_width):
-                grid[h_display, w_display] = self.make_play_move_button(h_display, w_display)
+                grid[h_display, w_display] = self._make_play_move_button(h_display, w_display)
 
         # add stone count on start and finish squares
         for i in [0, 2]:
             for j in [self.w_display_start, self.w_display_finish]:
-                grid[i, j].description = f'{game.board[self.transform_to_internal(i, j)]}'
+                grid[i, j].description = f'{game.board[self._transform_to_internal(i, j)]}'
                 grid[i, j].style = {'button_color': self.style['yellow'], 'font_size': '20'}
                 if i == 0:
                     grid[i, j].add_class("red_font")
@@ -264,27 +267,27 @@ class Board:
         # add rosettes
         for h in [0, 1]:
             for w in game.rosettes:
-                grid[self.transform_to_display(h, w)].add_class("rosette_style")
+                grid[self._transform_to_display(h, w)].add_class("rosette_style")
 
     def update(self):
         for h_display in range(self.board_height):
             for w_display in range(self.board_width):
-                self.update_square(h_display, w_display)
+                self._update_square(h_display, w_display)
 
     def update_affected_squares(self, turn, move, rolled):
-        _, w_display_before = self.transform_to_display(turn, move)
-        _, w_display = self.transform_to_display(turn, move + rolled)
+        _, w_display_before = self._transform_to_display(turn, move)
+        _, w_display = self._transform_to_display(turn, move + rolled)
 
         for h_display in range(self.board_height):
-            self.update_square(h_display, w_display)
-            self.update_square(h_display, w_display_before)
-        self.update_starts()
+            self._update_square(h_display, w_display)
+            self._update_square(h_display, w_display_before)
+        self._update_starts()
 
-    def update_starts(self):
+    def _update_starts(self):
         for h_display in [0, 2]:
-            self.update_square(h_display, self.w_display_start)
+            self._update_square(h_display, self.w_display_start)
 
-    def update_square(self, h_display, w_display):
+    def _update_square(self, h_display, w_display):
         """Updates button color/number, after the internal board has been updated, but with the turn argument
         being the turn before it was updated, so the identity of the player who last moved.
         """
@@ -319,14 +322,14 @@ class Board:
 
             button.style = {'button_color': color}
 
-    def make_play_move_button(self, h_display, w_display):
-        h, w = self.transform_to_internal(h_display, w_display)
+    def _make_play_move_button(self, h_display, w_display):
+        h, w = self._transform_to_internal(h_display, w_display)
         btn_play = make_button('', 'white', action=partial(self.interface.play_move, move=w, h_display=h_display))
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
 
-    def transform_to_display(self, i, j):
+    def _transform_to_display(self, i, j):
         """Go from internal board representation coordinates (2x16) to displayed board (3x8) coordinates"""
         if j < self.game.mid_start:
             j_display = self.game.mid_start - 1 - j
@@ -340,7 +343,7 @@ class Board:
 
         return i_display, j_display
 
-    def transform_to_internal(self, i, j):
+    def _transform_to_internal(self, i, j):
         """Go from to displayed board (3x8) coordinates to internal board representation coordinates (2x16)"""
         if i == 1:  # middle row
             i_internal = self.game.turn
@@ -360,9 +363,9 @@ class Roll:
         self.game = game
         self.style = style
         self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
+    def _init_grid(self):
         self.grid[0, 0] = make_button(f'{self.game.rolled}', self.style['yellow'], css_style="red_font")
         self.grid[2, 0] = make_button('', self.style['yellow'], css_style="blue_font")
 
@@ -376,11 +379,13 @@ class Players:
         self.interface = interface
         self.style = style
         self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
-        self.grid[0, :] = make_button('You', self.style['yellow'], css_style="red_font_small", action=self.interface.play_pass)
-        self.grid[2, :] = make_button('TD-Ur', self.style['yellow'], css_style="blue_font_small", action=self.interface.play_agent)
+    def _init_grid(self):
+        self.grid[0, :] = make_button('You', self.style['yellow'], css_style="red_font_small",
+                                      action=self.interface.play_pass)
+        self.grid[2, :] = make_button('TD-Ur', self.style['yellow'], css_style="blue_font_small",
+                                      action=self.interface.play_agent)
 
     def update(self):
         human = self.interface.human
@@ -402,13 +407,13 @@ class Options:
         self.auto_play = False
 
         self.grid = make_empty_grid(style, cells_high, cells_wide)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
-        self.grid[self.new_game_index, :] = make_button('New Game', self.style['yellow'], css_style="button_font",
-                                                        action=self.interface.start_new_game)
-        self.grid[self.auto_play_index, :] = make_button('auto-play: off', self.style['yellow'], css_style="button_font",
-                                                         action=self.toggle_auto_play)
+    def _init_grid(self):
+        self.grid[self.new_game_index, :] = make_button('New Game', self.style['yellow'],
+                                                        css_style="button_font", action=self.interface.start_new_game)
+        self.grid[self.auto_play_index, :] = make_button('auto-play: off', self.style['yellow'],
+                                                         css_style="button_font", action=self.toggle_auto_play)
 
     def toggle_auto_play(self, button):
         if self.auto_play:
@@ -417,7 +422,7 @@ class Options:
         else:
             self.auto_play = True
             self.grid[self.auto_play_index, :].description = 'auto-play: on'
-            self.interface.do_auto_play()
+            self.interface._do_auto_play()
 
 
 class Scores:
@@ -429,9 +434,9 @@ class Scores:
         self.values = [0, 0]
 
         self.grid = make_empty_grid(style, cells_high, cells_wide)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
+    def _init_grid(self):
         self.grid[self.header_h, :] = make_label('scores')
         self.grid[self.player_h, :-1] = make_label('You')
         self.grid[self.agent_h, :-1] = make_label('TD-Ur')
@@ -453,9 +458,9 @@ class Messages:
         self.main_index = 1
         self.detail_index = 2
         self.grid = make_empty_grid(style, cells_high, cells_wide)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
+    def _init_grid(self):
         self.grid[self.main_index, :] = make_label(' ', css_style="message_style")
         self.grid[self.detail_index, :] = make_label(' ', css_style="detailed_message_style")
 
@@ -481,9 +486,9 @@ class Labels:
         self.roll_index = 8
 
         self.grid = make_empty_grid(style, cells_high, cells_wide)
-        self.init_grid()
+        self._init_grid()
 
-    def init_grid(self):
+    def _init_grid(self):
         self.grid[0, 9::] = make_label('players')
 
         self.grid[0, self.start_index] = make_label('start')
