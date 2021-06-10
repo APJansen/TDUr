@@ -17,64 +17,6 @@ BOARD_SAFE_SQUARE = 8
 BOARD_PIECES = 7
 
 
-@partial(jit, static_argnums=(1, 2))
-def legal_moves_array(board, turn, rolled):
-    # moves that don't move a stone beyond the finish, based only on the die roll
-    start_squares = board[turn, 0:BOARD_FINISH + 1 - rolled]
-    # the corresponding end squares
-    end_squares = board[turn, rolled: BOARD_FINISH + 1]
-
-    # start square contains a stone to move
-    moves_with_legal_start = start_squares > 0
-
-    # end square does not contain player stone (or is finish)
-    moves_with_legal_end = end_squares == 0
-    moves_with_legal_end = index_update(moves_with_legal_end, index[-1], True)
-
-    # it's not a capture on the safe space
-    safe_space = jnp.zeros(BOARD_FINISH + 1 - rolled, dtype='bool')
-    safe_space = index_update(safe_space, index[BOARD_SAFE_SQUARE - rolled], True)
-    opponent_present = board[(turn + 1) % 2, rolled: BOARD_FINISH + 1] > 0
-    no_illegal_capture = ~(opponent_present & safe_space)
-
-    legal_moves = moves_with_legal_start & moves_with_legal_end & no_illegal_capture
-
-    return legal_moves
-
-
-@jit
-def get_new_board(board, move, rolled, turn):
-    end = move + rolled
-    # move player's stone forward
-    indices_x, indices_y, values = [turn, turn], [move, end], [board[turn, move] - 1, board[turn, end] + 1]
-
-    # construct auxiliary boards to help with logic
-    rosette_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
-    for i in BOARD_ROSETTES:
-        rosette_board = index_update(rosette_board, i, 1)
-    capture_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
-    capture_board = index_update(capture_board, (index[BOARD_MID_START:BOARD_MID_ENDED]), 1)
-
-    # change turn, unless ending on a rosette
-    other = (turn + 1) % 2
-    new_turn = (turn + 1 + rosette_board[end]) % 2
-
-    # capture, if opponent present and in capturable area
-    indices_x, indices_y = indices_x + [other, other], indices_y + [end, BOARD_START]
-    values = values + [(1 - capture_board[end]) * board[other, end],
-                       board[other, BOARD_START] + capture_board[end] * board[other, end]]
-
-    new_board = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
-
-    not_finished = jnp.sign(BOARD_PIECES - new_board[turn, BOARD_FINISH])
-    new_winner = not_finished * -1 + (1 - not_finished) * turn
-
-    return new_board, new_turn, new_winner
-
-
-get_new_boards = jit(vmap(get_new_board, in_axes=(None, 0, None, None)))
-
-
 class Ur:
     """
     The Ur board looks like this:
@@ -99,15 +41,16 @@ class Ur:
 
     def __init__(self):
         # board
-        self.start = BOARD_START
-        self.finish = BOARD_FINISH
-        self.rosettes = BOARD_ROSETTES
-        self.safe_square = BOARD_SAFE_SQUARE
-        self.mid_start = BOARD_MID_START
-        self.mid_ended = BOARD_MID_ENDED
+        self.start = 0
+        self.finish = 15
+        self.rosettes = [4, 8, 14]
+        self.safe_square = 8
+        self.mid_start = 5
+        self.mid_ended = 13
+        self.board_width_internal = 16
 
         # piece
-        self.n_pieces = BOARD_PIECES
+        self.n_pieces = 7
 
         # die
         self.n_die = 4
@@ -117,6 +60,9 @@ class Ur:
 
         # display
         self.display_width = 8
+
+        # jitted function
+        self._get_new_boards = jit(vmap(self._get_new_board, in_axes=(None, 0, None, None)))
 
         # state
         self.rolled = self.turn = self.winner = self.board = self.move_count = self.backup_state = None
@@ -140,7 +86,7 @@ class Ur:
     def legal_moves(self):
         """Return a list of legal moves.
 
-        Relies on jitted function `legal_moves_array`.
+        Relies on jitted function `_legal_moves_array`.
 
         Returns:
             List of integers representing legal squares to move from, counted along the route.
@@ -148,7 +94,7 @@ class Ur:
         if self.rolled == 0:
             moves = []
         else:
-            moves_array = legal_moves_array(self.board, self.turn, self.rolled)
+            moves_array = self._legal_moves_array(self.board, self.turn, self.rolled)
             moves = np.where(moves_array)[0].tolist()
         return moves if moves else ['pass']
 
@@ -157,7 +103,7 @@ class Ur:
 
         Plays the move on the board, changes turn (if appropriate) and rolls the dice again.
         Also increments `move_count` and sets `winner` to the player who moved if the game is won.
-        Relies on the jitted function `get_new_board`.
+        Relies on the jitted function `_get_new_board`.
 
 
         Args:
@@ -170,7 +116,7 @@ class Ur:
             self._change_turn()
             self._roll()
         else:
-            new_board, new_turn, new_winner = get_new_board(self.board, move, self.rolled, self.turn)
+            new_board, new_turn, new_winner = self._get_new_board(self.board, move, self.rolled, self.turn)
 
             self.board = np.array(new_board)
 
@@ -229,7 +175,7 @@ class Ur:
     def simulate_moves(self, moves):
         """Give afterstates resulting from moves.
 
-        Relies on function `get_new_boards`, a `vmap` of `get_new_board`
+        Relies on function `_get_new_boards`, a `vmap` of `get_new_board`
 
         Args:
             moves: A list of legal moves.
@@ -237,7 +183,62 @@ class Ur:
         Returns:
             A list of tuples (board, turn, winner), one for each move.
         """
-        return get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
+        return self._get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
+
+    @staticmethod
+    @partial(jit, static_argnums=(1, 2))
+    def _legal_moves_array(board, turn, rolled):
+        # moves that don't move a stone beyond the finish, based only on the die roll
+        start_squares = board[turn, 0:BOARD_FINISH + 1 - rolled]
+        # the corresponding end squares
+        end_squares = board[turn, rolled: BOARD_FINISH + 1]
+
+        # start square contains a stone to move
+        moves_with_legal_start = start_squares > 0
+
+        # end square does not contain player stone (or is finish)
+        moves_with_legal_end = end_squares == 0
+        moves_with_legal_end = index_update(moves_with_legal_end, index[-1], True)
+
+        # it's not a capture on the safe space
+        safe_space = jnp.zeros(BOARD_FINISH + 1 - rolled, dtype='bool')
+        safe_space = index_update(safe_space, index[BOARD_SAFE_SQUARE - rolled], True)
+        opponent_present = board[(turn + 1) % 2, rolled: BOARD_FINISH + 1] > 0
+        no_illegal_capture = ~(opponent_present & safe_space)
+
+        legal_moves = moves_with_legal_start & moves_with_legal_end & no_illegal_capture
+
+        return legal_moves
+
+    @staticmethod
+    @jit
+    def _get_new_board(board, move, rolled, turn):
+        end = move + rolled
+        # move player's stone forward
+        indices_x, indices_y, values = [turn, turn], [move, end], [board[turn, move] - 1, board[turn, end] + 1]
+
+        # construct auxiliary boards to help with logic
+        rosette_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
+        for i in BOARD_ROSETTES:
+            rosette_board = index_update(rosette_board, i, 1)
+        capture_board = jnp.zeros(shape=BOARD_WIDTH_INTERNAL, dtype='int8')
+        capture_board = index_update(capture_board, (index[BOARD_MID_START:BOARD_MID_ENDED]), 1)
+
+        # change turn, unless ending on a rosette
+        other = (turn + 1) % 2
+        new_turn = (turn + 1 + rosette_board[end]) % 2
+
+        # capture, if opponent present and in capturable area
+        indices_x, indices_y = indices_x + [other, other], indices_y + [end, BOARD_START]
+        values = values + [(1 - capture_board[end]) * board[other, end],
+                           board[other, BOARD_START] + capture_board[end] * board[other, end]]
+
+        new_board = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
+
+        not_finished = jnp.sign(BOARD_PIECES - new_board[turn, BOARD_FINISH])
+        new_winner = not_finished * -1 + (1 - not_finished) * turn
+
+        return new_board, new_turn, new_winner
 
     def check_valid_board(self):
         """Return True if current board is valid, otherwise returns a string describing the first found violation."""

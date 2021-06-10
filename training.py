@@ -40,6 +40,25 @@ def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay, search_plies=1)
 
 def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, search_plies=1, iprint=100, save=False,
           learning_rate_decay=1, episode_start=0, custom_name=False):
+    """Train an agent through self play of a game using TD(lambda).
+
+    Update agent's params attribute after every move.
+
+    Args:
+        agent: The agent instance to train.
+        game: The game instance to play.
+        episodes: The number of games to train for.
+        learning_rate:
+        epsilon:
+        lmbda:
+        discount:
+        search_plies:
+        iprint:
+        save:
+        learning_rate_decay:
+        episode_start:
+        custom_name:
+    """
     red_wins = 0
     start = time.time()
     total_moves = 0
