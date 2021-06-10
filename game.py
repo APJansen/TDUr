@@ -188,6 +188,18 @@ class Ur:
     @staticmethod
     @partial(jit, static_argnums=(1, 2))
     def _legal_moves_array(board, turn, rolled):
+        """Return a boolean array indicating which moves are legal.
+
+        Jitted function.
+
+        Args:
+            board: The current board.
+            turn: Whose turn it is.
+            rolled: The die roll
+
+        Returns:
+            A jnp boolean vector with Trues for the legal moves.
+        """
         # moves that don't move a stone beyond the finish, based only on the die roll
         start_squares = board[turn, 0:BOARD_FINISH + 1 - rolled]
         # the corresponding end squares
@@ -213,6 +225,20 @@ class Ur:
     @staticmethod
     @jit
     def _get_new_board(board, move, rolled, turn):
+        """Return board after given move is played.
+
+        Jitted function.
+
+        Args:
+            board: The board before the move is played.
+            move: The move (integer indicating the square to move from as counted along the route).
+            rolled: The die roll.
+            turn: Whose turn it is (0 or 1).
+
+        Returns:
+            A tuple of the form `(board, turn, winner)` giving the resulting board and turn, and `winner` indicating
+            whether the game has been won and by who.
+        """
         end = move + rolled
         # move player's stone forward
         indices_x, indices_y, values = [turn, turn], [move, end], [board[turn, move] - 1, board[turn, end] + 1]
@@ -283,6 +309,7 @@ class Ur:
         self._annotate_board()
 
     def _reshape_board(self):
+        """Turn the internal 2x16 board into the conventional 3x8 shape."""
         reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
         reshaped_board[1] = (self.board[0, self.mid_start:self.mid_ended] -
                              self.board[1, self.mid_start:self.mid_ended])
@@ -294,6 +321,7 @@ class Ur:
         return reshaped_board
 
     def _annotate_board(self):
+        """Add labels and decorations."""
         t_x, t_y = 4.2, 0.7
         # stones at start and finish
         stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]
