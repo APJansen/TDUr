@@ -8,8 +8,9 @@ from functools import partial
 
 
 class Ur:
-    """
-    The Ur board looks like this:
+    """Class representing the Royal game of Ur.
+
+    The Ur board looks like this: this is the displayed board
     ------------------------------------
     | 4 | 3 | 2 | 1 | s |  f | 14 | 13 |
     ------------------------------------
@@ -21,15 +22,31 @@ class Ur:
     have to go through (s) or have already finished (f) are located.
     To fully specify a game state, this needs to be supplemented with the last die throw and whose turn it is.
 
-    we unroll this and copy the middle row that's shared between the two players, to give:
+    we unroll this and copy the middle row that's shared between the two players, to give the internal board:
     --------------------------------------------------------------------
     s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
     --------------------------------------------------------------------
     s | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | f |
     --------------------------------------------------------------------
+
+    Attributes:
+        board: The internal game board, a 2x16 integer valued numpy array.
+        turn: Indicating whose turn it is, 0 or 1.
+        rolled: The last die roll.
+        winner: Indicating who won, 0 or 1 for either player or -1 for not finished yet.
+        start: Width coordinate of the start square of the board.
+        finish: Width coordinate of the finish square of the board.
+        safe_square: Width coordinate of the middle rosette.
+        rosettes: Tuple of width coordinates for the rosettes.
+        mid_start: The number of squares from the start, along the route, where the middle row starts.
+        mid_ended: The number of squares from the start, along the route, where the middle row has ended.
+        display_width: The display board's width.
+        rolls: The possible die rolls.
+        probabilities: The probabilities of each die roll.
     """
 
     def __init__(self):
+        """Construct an Ur game."""
         # board
         self.start = 0
         self.finish = 15

@@ -82,8 +82,15 @@ style_string = """
 
 
 class InteractiveGame:
+    """Class representing the game of Ur, interactively playable against an AI agent."""
 
     def __init__(self, agent_parameters, search_plies=2):
+        """Construct an interactive Ur game.
+
+        Args:
+            agent_parameters: The parameters of the agent's value function network.
+            search_plies: Optional, how many ply to search for, 1 or 2, defaults to 2.
+        """
         self.game = Ur()
         self.agent = TDUr(hidden_units=agent_parameters[0][0].shape[0])
         self.agent.set_params(agent_parameters)
