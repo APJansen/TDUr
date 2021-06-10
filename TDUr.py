@@ -6,87 +6,22 @@ import os
 import pickle
 
 
-# shouldn't value(flip(board)) = 1 - value(board)? how to impose?
-# can use this symmetry: always compute value of board where it's player 0's turn.
-# so if it's player 0's turn, compute value (can get rid of turn indices) and just return it
-# but if it's player 1's turn, flip the board, compute the value of that board, and return 1 - value.
-# this way what's returned is still always the value from player 0's perspective.
-# this should enforce a 50/50 win rate in self play (up to starting player's advantage)
-@jit
-def compute_value(params, board, turn):
-    # make it so that it always analyzes boards where it's player 0's turn
-    other = (turn + 1) % 2
-    board = jnp.array([board[turn], board[other]])
-
-    activations = jnp.reshape(board, -1)
-    for w, b in params[:-1]:
-        outputs = jnp.dot(w, activations) + b
-        activations = relu(outputs)
-
-    final_w, final_b = params[-1]
-    logit = jnp.reshape(jnp.dot(final_w, activations) + final_b, (()))
-    value = sigmoid(logit)
-
-    return other * value + turn * (1 - value)
-
-
-value_grad = jit(grad(compute_value))
-compute_values = jit(vmap(compute_value, in_axes=(None, 0, 0)))
-
-
-@jit
-def min_max_move(values, turn):
-    return jnp.argmax((1 - 2 * turn) * values)
-
-
-@jit
-def get_new_params(params, scalar, eligibility):
-    return [(w + scalar * z_w, b + scalar * z_b) for (w, b), (z_w, z_b) in zip(params, eligibility)]
-
-
-# def random_layer_params(m, n, key, scale=1e-2):
-#     w_key, b_key = random.split(key)
-#     return scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
-#
-#
-# def init_network_params(sizes, key):
-#     keys = random.split(key, len(sizes))
-#     return [random_layer_params(m, n, k) for m, n, k in zip(sizes[:-1], sizes[1:], keys)]
-
-
-def random_layer_params(n_in, n_out, key, activation):
-    w_key, b_key = random.split(key)
-    if activation == 'sigmoid':
-        scale = jnp.sqrt(1 / n_in)
-        weights = scale * random.normal(w_key, (n_out, n_in))
-        biases = jnp.zeros(shape=(n_out,))
-    else:  # activation == 'relu'
-        scale = jnp.sqrt(2 / n_in)
-        weights = scale * random.normal(w_key, (n_out, n_in))
-        biases = jnp.zeros(shape=(n_out,)) + 0.1
-
-    return weights, biases
-
-
-def init_network_params(n_in, n_hidden, n_out, key):
-    keys = random.split(key, 2)
-    layer_1 = random_layer_params(n_in=n_in, n_out=n_hidden, key=keys[0], activation='relu')
-    layer_2 = random_layer_params(n_in=n_hidden, n_out=n_out, key=keys[1], activation='sigmoid')
-    return [layer_1, layer_2]
-
-
 class TDUr:
 
     def __init__(self, hidden_units=40, key=random.PRNGKey(42)):
         self.input_units = 32
         self.hidden_units = hidden_units
         self.key = key
-        self.params = init_network_params(self.input_units, self.hidden_units, 1, key)
+        self.params = self._init_network_params()
+
+        # jitted functions
+        self._value_grad = jit(grad(self._compute_value))
+        self._compute_values = jit(vmap(self._compute_value, in_axes=(None, 0, 0)))
 
     def value(self, board, turn):
         """Return value as seen from player 0's perspective.
 
-        Relies on jitted `compute_value`.
+        Relies on jitted `_compute_value`.
 
         Args:
             board: A game board, a 2D numpy array of integers.
@@ -95,12 +30,12 @@ class TDUr:
         Returns:
             Estimated win probability of player 0.
         """
-        return compute_value(self.params, board, turn)
+        return self._compute_value(self.params, board, turn)
 
     def value_gradient(self, board, turn):
         """Return the gradient of the value function.
 
-        Relies on jitted grad of `compute_value`: `value_grad`.
+        Relies on jitted grad of `_compute_value`: `_value_grad`.
 
         Args:
             board: A game board, a 2D numpy array of integers.
@@ -109,7 +44,7 @@ class TDUr:
         Returns:
             The gradient of the value function, a list of jax.numpy tensors of the same shape as the agent's parameters.
         """
-        return value_grad(self.params, board, turn)
+        return self._value_grad(self.params, board, turn)
 
     def get_params(self):
         """Return agent parameters."""
@@ -118,10 +53,6 @@ class TDUr:
     def set_params(self, parameter_values):
         """Set agent parameters. Must be compatible with `hidden_units` attribute."""
         self.params = parameter_values
-
-    def init_params(self):
-        """Initialize parameters."""
-        self.params = init_network_params(self.input_units, self.hidden_units, 1, self.key)
 
     def save_params(self, name, directory='parameters'):
         """Save the current agent parameters to a file, pickled.
@@ -142,7 +73,7 @@ class TDUr:
             scalar: the product of the learning rate and TD-error.
             eligibility: The eligibility trace.
         """
-        self.params = get_new_params(self.params, scalar, eligibility)
+        self.params = self._get_new_params(self.params, scalar, eligibility)
 
     def policy(self, game, plies=1, epsilon=0):
         """Return the greedy (or epsilon-greedy) move based on the input game's state and the agent's value function.
@@ -164,7 +95,7 @@ class TDUr:
 
         values = self.move_values(game, moves=moves, plies=plies)
 
-        chosen_move = moves[min_max_move(values, game.turn)]
+        chosen_move = moves[self._min_max_move(values, game.turn)]
         return chosen_move
 
     def move_values(self, game, moves=False, plies=1):
@@ -184,7 +115,7 @@ class TDUr:
         boards, turns, wins = game.simulate_moves(moves)
 
         if plies == 1:
-            values = compute_values(self.params, boards, turns)
+            values = self._compute_values(self.params, boards, turns)
         else:  # plies == 2
             game.backup()
 
@@ -204,3 +135,94 @@ class TDUr:
             game.restore_backup()
 
         return values
+
+    def _init_network_params(self):
+        """Initialize the parameters of the neural network.
+
+        Uses He initialization for the first layer which has relu activation, and Xavier for the second,
+        which has sigmoid activation.
+        """
+        keys = random.split(self.key, 2)
+        n_in, n_hidden, n_out = self.input_units, self.hidden_units, 1
+        layer_1 = self._random_layer_params(n_in=n_in, n_out=n_hidden, key=keys[0], activation='relu')
+        layer_2 = self._random_layer_params(n_in=n_hidden, n_out=n_out, key=keys[1], activation='sigmoid')
+        return [layer_1, layer_2]
+
+    @staticmethod
+    @jit
+    def _compute_value(params, board, turn):
+        """Return the value of the given state computed with the given parameters.
+
+        Imposes reflection symmetry (of board and players) by transforming the board to make it always player 0's turn.
+        Independently from this, the value returned is always the value as seen from player 0's perspective.
+        So if it is player 0's turn, compute the value and return it.
+        But if it is player 1's turn, flip the board to make it player 0's turn, compute the value of that board,
+        and return 1 - value.
+
+        Args:
+            params: The neural network parameters.
+            board: The game board on which to compute a state.
+            turn: Integer (0 or 1) indicating whose turn it is.
+
+        Returns:
+            The computed value.
+        """
+        # make it so that it always analyzes boards where it's player 0's turn
+        other = (turn + 1) % 2
+        board = jnp.array([board[turn], board[other]])
+
+        activations = jnp.reshape(board, -1)
+        for w, b in params[:-1]:
+            outputs = jnp.dot(w, activations) + b
+            activations = relu(outputs)
+
+        final_w, final_b = params[-1]
+        logit = jnp.reshape(jnp.dot(final_w, activations) + final_b, (()))
+        value = sigmoid(logit)
+
+        return other * value + turn * (1 - value)
+
+    @staticmethod
+    @jit
+    def _min_max_move(values, turn):
+        """Return the index of the maximum (turn==0) or minimum (turn==1), depending on the turn.
+
+        Args:
+            values: A list of values.
+            turn: Integer indicating whose turn it is (0 or 1).
+
+        Returns:
+            The index with maximal or minimal value.
+        """
+        return jnp.argmax((1 - 2 * turn) * values)
+
+    @staticmethod
+    @jit
+    def _get_new_params(params, scalar, eligibility):
+        """Return the updated parameters."""
+        return [(w + scalar * z_w, b + scalar * z_b) for (w, b), (z_w, z_b) in zip(params, eligibility)]
+
+    @staticmethod
+    def _random_layer_params(n_in, n_out, key, activation):
+        """Initialize parameters for a single layer.
+
+        Args:
+            n_in: Number of input units.
+            n_out: Number of output units.
+            key: A jax random key.
+            activation: A string specifying the activation used, `'relu'` or `'sigmoid'`.
+
+        Returns:
+            Tuple (weights, biases)
+        """
+        w_key, b_key = random.split(key)
+        if activation == 'sigmoid':
+            scale = jnp.sqrt(1 / n_in)
+            weights = scale * random.normal(w_key, (n_out, n_in))
+            biases = jnp.zeros(shape=(n_out,))
+        else:  # activation == 'relu'
+            scale = jnp.sqrt(2 / n_in)
+            weights = scale * random.normal(w_key, (n_out, n_in))
+            biases = jnp.zeros(shape=(n_out,)) + 0.1
+
+        return weights, biases
