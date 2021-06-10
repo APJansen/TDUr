@@ -4,9 +4,11 @@ from jax import jit
 from functools import partial
 
 
-def init_eligibility(sizes):
+@partial(jit, static_argnums=(0, 1))
+def init_eligibility(input_units, hidden_units):
     """Initialize the eligibility trace to zero."""
-    return [(jnp.ones(shape=(n, m)), jnp.ones(shape=(n,))) for m, n in zip(sizes[:-1], sizes[1:])]
+    sizes = [input_units, hidden_units, 1]
+    return [(jnp.zeros(shape=(n, m)), jnp.zeros(shape=(n,))) for m, n in zip(sizes[:-1], sizes[1:])]
 
 
 @jit
@@ -91,7 +93,7 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
     for episode in range(episode_start, episode_start + episodes + 1):
         game.reset()
         finished = False
-        eligibility = init_eligibility([agent.input_units, agent.hidden_units, 1])
+        eligibility = init_eligibility(agent.input_units, agent.hidden_units)
 
         new_value = agent.value(game.board, game.turn)
 
