@@ -1,7 +1,19 @@
-import numpy as np
+def compete_policies(game, agent_1, agent_2, episodes=1_000, search_plies_1=1, search_plies_2=1):
+    """Compete two agents against each other.
 
+    Alternates the agent's colors after each game and agents use epsilon=0 (no exploration).
 
-def compete_policies(game, pi_1, pi_2, episodes=1_000, search_plies_1=1, search_plies_2=1):
+    Args:
+        game: A game instance, needs `reset()` and `play_move(move)` methods and `turn` attribute.
+        agent_1: The first agent, needs a `policy(game, epsilon, search_plies)` method.
+        agent_2: The second agent, needs a `policy(game, epsilon, search_plies)` method.
+        episodes: The number of games to play.
+        search_plies_1: How many ply agent_1 searches (1 or 2).
+        search_plies_2:How many ply agent_2 searches (1 or 2).
+
+    Returns:
+        Two element list of win fractions.
+    """
     scores = [0, 0]
     for episode in range(episodes):
         game.reset()
@@ -9,9 +21,9 @@ def compete_policies(game, pi_1, pi_2, episodes=1_000, search_plies_1=1, search_
 
         while game.winner == -1:
             if game.turn == player_1:
-                move = pi_1.policy(game, epsilon=0, plies=search_plies_1)
+                move = agent_1.policy(game, epsilon=0, plies=search_plies_1)
             else:
-                move = pi_2.policy(game, epsilon=0, plies=search_plies_2)
+                move = agent_2.policy(game, epsilon=0, plies=search_plies_2)
             game.play_move(move)
 
         if game.winner == player_1:
@@ -19,15 +31,4 @@ def compete_policies(game, pi_1, pi_2, episodes=1_000, search_plies_1=1, search_
         else:
             scores[1] += 1
 
-    return scores
-#
-#
-# def payoff_matrix(game, policies, episodes=1_000):
-#     n_policies = len(policies)
-#     payoffs = np.zeros(shape=(n_policies, n_policies))
-#     for i, pi_1 in enumerate(policies):
-#         for j, pi_2 in enumerate(policies):
-#             if j > i:
-#                 scores = compete_policies(game, pi_1, pi_2, episodes=episodes)[0]
-#                 payoffs[i, j] = scores[0] / episodes
-#     return payoffs
+    return [score / episodes for score in scores]
