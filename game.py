@@ -123,6 +123,7 @@ class Ur:
         self.reset()
 
     def reset(self):
+        """Reset the game to the initial state."""
         self.turn = 0
         self.winner = -1
         self.board = np.zeros(shape=(2, self.finish + 1), dtype=np.int8)
@@ -138,9 +139,13 @@ class Ur:
 
     def legal_moves(self):
         """Return a list of legal moves.
-        A move is represented by the square number of the piece that is moved, counted along the route.
 
-        Relies on jitted function `legal_moves_array`."""
+        Relies on jitted function `legal_moves_array`.
+
+        Returns:
+            list of integers representing legal squares to move from, counted along the route.
+
+        """
         if self.rolled == 0:
             moves = []
         else:
@@ -149,12 +154,17 @@ class Ur:
         return moves if moves else ['pass']
 
     def play_move(self, move):
-        """Input: the move to play.
-        A move is represented by the square number of the piece that is moved, counted along the route.
+        """Play the given legal move.
+
         Plays the move on the board, changes turn (if appropriate) and rolls the dice again.
         Also increments `move_count` and sets `winner` to the player who moved if the game is won.
+        Relies on the jitted function `get_new_board`.
 
-        Relies on the jitted function `get_new_board`."""
+
+        Args:
+            move: Integer representing the square to move from, as counted along the route.
+
+        """
         self.move_count += 1
 
         if move == 'pass':
@@ -193,17 +203,21 @@ class Ur:
         """Return True if the game has finished, False if not."""
         return self.winner != -1
 
-    # to allow n-step methods and planning
     def get_state(self):
         """Return the current state of the game.
-        The state consists of a tuple:
-        (board, turn, rolled, winner, move_count)"""
+
+        Returns:
+            A game state of the form `(board, turn, rolled, winner, move_count)`.
+
+        """
         return self.board.copy(), self.turn, self.rolled, self.winner, self.move_count
 
     def set_state(self, state):
         """Set the game to the input state.
 
-        Input: a game state of the form (board, turn, rolled, winner, move_count).
+        Args:
+            state: A game state of the form `(board, turn, rolled, winner, move_count)`.
+
         """
         self.board, self.turn, self.rolled, self.winner, self.move_count = state
 
@@ -212,17 +226,21 @@ class Ur:
         self.backup_state = self.get_state()
 
     def restore_backup(self):
-        """Restore the current state of the game from the attribute `backup_state`"""
+        """Restore the current state of the game from the attribute `backup_state`."""
         self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_state
 
     def simulate_moves(self, moves):
         """Give afterstates resulting from moves.
 
-        Input: a list of (legal) moves.
+        Relies on function `get_new_boards`, a `vmap` of `get_new_board`
 
-        Output: a list of tuples (board, turn, winner), as resulting from each move.
+        Args:
+            moves: A list of legal moves.
 
-        Relies on function `get_new_boards`, a `vmap` of `get_new_board`"""
+        Returns:
+            A list of tuples (board, turn, winner), one for each move.
+
+        """
         return get_new_boards(self.board, jnp.array(moves), self.rolled, self.turn)
 
     def check_valid_board(self):
