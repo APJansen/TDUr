@@ -4,62 +4,6 @@ from jax import jit
 from functools import partial
 
 
-@partial(jit, static_argnums=(0, 1))
-def init_eligibility(input_units, hidden_units):
-    """Initialize the eligibility trace to zero."""
-    sizes = [input_units, hidden_units, 1]
-    return [(jnp.zeros(shape=(n, m)), jnp.zeros(shape=(n,))) for m, n in zip(sizes[:-1], sizes[1:])]
-
-
-@jit
-def update_eligibility(eligibility, scalar, grad_value):
-    """Update the parameters according to TD(lambda).
-
-    Args:
-        eligibility: The eligibility trace.
-        scalar: The product of the learning rate and the TD-error.
-        grad_value: The value gradient.
-
-    Returns:
-        parameters, list of jax.numpy tensors
-    """
-    return [(scalar * z_w + dv_dw, scalar * z_b + dv_db) for (z_w, z_b), (dv_dw, dv_db) in zip(eligibility, grad_value)]
-
-
-@partial(jit, static_argnums=3)
-def get_TD_error(new_value, value, reward, has_finished, discount):
-    """Return TD error.
-
-    Args:
-        new_value: Value at next state.
-        value: Value at current state.
-        reward: Reward in transitioning to next state.
-        has_finished: If the game has finished.
-        discount: Discount factor.
-
-    Returns:
-        The TD error.
-    """
-    if has_finished:
-        # when the game has been won, the reward itself is the total return, shouldn't bootstrap anymore.
-        return reward - value
-    else:
-        return reward + discount * new_value - value
-
-
-def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay, search_plies=1):
-    """Return name for parameter save file based on the hyperparameters."""
-    name = f'N{agent.hidden_units:d}'
-    name += f'-alpha{learning_rate:.3f}'
-    name += f'-lambda{lmbda:.2f}'
-    name += f'-epsilon{epsilon:.5f}'
-    name += f'-dalpha{lr_decay:.6f}'
-    if search_plies > 1:
-        name += f'-plies{search_plies}'
-
-    return name
-
-
 def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, search_plies=1, iprint=100, save=False,
           learning_rate_decay=1, episode_start=0, custom_name=False):
     """Train an agent through self play of a game using TD(lambda).
@@ -131,3 +75,59 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
             red_wins = 0
             if save:
                 agent.save_params(name + f'-episodes{episode:d}')
+
+
+@partial(jit, static_argnums=3)
+def get_TD_error(new_value, value, reward, has_finished, discount):
+    """Return TD error.
+
+    Args:
+        new_value: Value at next state.
+        value: Value at current state.
+        reward: Reward in transitioning to next state.
+        has_finished: If the game has finished.
+        discount: Discount factor.
+
+    Returns:
+        The TD error.
+    """
+    if has_finished:
+        # when the game has been won, the reward itself is the total return, shouldn't bootstrap anymore.
+        return reward - value
+    else:
+        return reward + discount * new_value - value
+
+
+@partial(jit, static_argnums=(0, 1))
+def init_eligibility(input_units, hidden_units):
+    """Initialize the eligibility trace to zero."""
+    sizes = [input_units, hidden_units, 1]
+    return [(jnp.zeros(shape=(n, m)), jnp.zeros(shape=(n,))) for m, n in zip(sizes[:-1], sizes[1:])]
+
+
+@jit
+def update_eligibility(eligibility, scalar, grad_value):
+    """Update the parameters according to TD(lambda).
+
+    Args:
+        eligibility: The eligibility trace.
+        scalar: The product of the learning rate and the TD-error.
+        grad_value: The value gradient.
+
+    Returns:
+        parameters, list of jax.numpy tensors
+    """
+    return [(scalar * z_w + dv_dw, scalar * z_b + dv_db) for (z_w, z_b), (dv_dw, dv_db) in zip(eligibility, grad_value)]
+
+
+def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay, search_plies=1):
+    """Return name for parameter save file based on the hyperparameters."""
+    name = f'N{agent.hidden_units:d}'
+    name += f'-alpha{learning_rate:.3f}'
+    name += f'-lambda{lmbda:.2f}'
+    name += f'-epsilon{epsilon:.5f}'
+    name += f'-dalpha{lr_decay:.6f}'
+    if search_plies > 1:
+        name += f'-plies{search_plies}'
+
+    return name
