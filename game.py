@@ -38,11 +38,9 @@ class Ur:
         finish: Width coordinate of the finish square of the board.
         safe_square: Width coordinate of the middle rosette.
         rosettes: Tuple of width coordinates for the rosettes.
-        mid_start: The number of squares from the start, along the route, where the middle row starts.
-        mid_ended: The number of squares from the start, along the route, where the middle row has ended.
-        display_width: The display board's width.
         rolls: The possible die rolls.
         probabilities: The probabilities of each die roll.
+        move_count: The amount of moves that have been played.
     """
 
     def __init__(self):
@@ -312,6 +310,58 @@ class Ur:
             if board[(self.winner + 1) % 2, self.finish] == self.n_pieces:
                 return "loser has won before winner"
         return True
+
+    def in_middle(self, w):
+        """Return true if given internal width coordinate is on the middle row in the display board."""
+        return self.mid_start <= w < self.mid_ended
+
+    def transform_to_display(self, h, w):
+        """Return display coordinates corresponding to given internal coordinates.
+
+        Internally the board is a 2x16 grid, the display board is 3x8.
+
+        Args:
+            h: The internal height coordinate.
+            w: The internal width coordinate.
+
+        Returns:
+            Tuple (h_display, w_display).
+        """
+        if w < self.mid_start:
+            w_display = self.mid_start - 1 - w
+            h_display = 2 * h
+        elif w >= self.mid_ended:
+            w_display = (self.display_width - 1) - (w - self.mid_ended)
+            h_display = 2 * h
+        else:
+            w_display = w - self.mid_start
+            h_display = 1
+
+        return h_display, w_display
+
+    def transform_to_internal(self, h_display, w_display):
+        """Return internal coordinates corresponding to given display coordinates.
+
+        Internally the board is a 2x16 grid, the display board is 3x8.
+
+        Args:
+            h_display: The display height coordinate.
+            w_display: The display width coordinate.
+
+        Returns:
+            Tuple (h, w).
+        """
+        if h_display == 1:  # middle row
+            h = self.turn
+            w = w_display + self.mid_start
+        else:
+            h = h_display // 2
+            if w_display < self.mid_start:
+                w = self.mid_start - 1 - w_display
+            else:
+                w = self.mid_ended - (w_display - (self.display_width - 1))
+
+        return h, w
 
     # Last 3 functions only for display purposes
     def display(self):

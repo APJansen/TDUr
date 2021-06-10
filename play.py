@@ -82,7 +82,11 @@ style_string = """
 
 
 class InteractiveGame:
-    """Class representing the game of Ur, interactively playable against an AI agent."""
+    """Class representing the game of Ur, interactively playable against an AI agent.
+
+    Attributes:
+        interface: The actual game.
+    """
 
     def __init__(self, agent_parameters, search_plies=2):
         """Construct an interactive Ur game.
@@ -286,8 +290,8 @@ class Board:
         self.board_height = cells_high
         self.board_width = cells_wide
 
-        self.w_display_start = self._transform_to_display(0, game.start)[1]
-        self.w_display_finish = self._transform_to_display(0, game.finish)[1]
+        self.w_display_start = self.game.transform_to_display(0, game.start)[1]
+        self.w_display_finish = self.game.transform_to_display(0, game.finish)[1]
 
         self.grid = make_empty_grid(style, cells_high, cells_wide, square=True)
         self._init_grid()
@@ -306,7 +310,7 @@ class Board:
         # add stone count on start and finish squares
         for i in [0, 2]:
             for j in [self.w_display_start, self.w_display_finish]:
-                grid[i, j].description = f'{game.board[self._transform_to_internal(i, j)]}'
+                grid[i, j].description = f'{game.board[self.game.transform_to_internal(i, j)]}'
                 grid[i, j].style = {'button_color': self.style['yellow'], 'font_size': '20'}
                 if i == 0:
                     grid[i, j].add_class("red_font")
@@ -320,7 +324,7 @@ class Board:
         # add rosettes
         for h in [0, 1]:
             for w in game.rosettes:
-                grid[self._transform_to_display(h, w)].add_class("rosette_style")
+                grid[self.game.transform_to_display(h, w)].add_class("rosette_style")
 
     def update(self):
         """Update all buttons in the board grid."""
@@ -338,8 +342,8 @@ class Board:
             move: The move played.
             rolled: The die roll.
         """
-        _, w_display_before = self._transform_to_display(turn, move)
-        _, w_display = self._transform_to_display(turn, move + rolled)
+        _, w_display_before = self.game.transform_to_display(turn, move)
+        _, w_display = self.game.transform_to_display(turn, move + rolled)
 
         for h_display in range(self.board_height):
             self._update_square(h_display, w_display)
@@ -372,7 +376,7 @@ class Board:
         # for squares on the board, update color
         else:
             red, blue = self.style['red'], self.style['blue']
-            if self.game.mid_start <= w < self.game.mid_ended:
+            if self.game.in_middle(w):
                 if game.board[0, w]:
                     color = red
                 elif game.board[1, w]:
@@ -401,59 +405,11 @@ class Board:
         Returns:
             An instance of the ipywidgets.Button class.
         """
-        h, w = self._transform_to_internal(h_display, w_display)
+        h, w = self.game.transform_to_internal(h_display, w_display)
         btn_play = make_button('', 'white', action=partial(self.interface.play_move, move=w, h_display=h_display))
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
-
-    def _transform_to_display(self, h, w):
-        """Return display coordinates corresponding to given internal coordinates.
-
-        Internally the board is a 2x16 grid, the display board is 3x8.
-
-        Args:
-            h: The internal height coordinate.
-            w: The internal width coordinate.
-
-        Returns:
-            Tuple (h_display, w_display).
-        """
-        if w < self.game.mid_start:
-            w_display = self.game.mid_start - 1 - w
-            h_display = 2 * h
-        elif w >= self.game.mid_ended:
-            w_display = (self.game.display_width - 1) - (w - self.game.mid_ended)
-            h_display = 2 * h
-        else:
-            w_display = w - self.game.mid_start
-            h_display = 1
-
-        return h_display, w_display
-
-    def _transform_to_internal(self, h_display, w_display):
-        """Return internal coordinates corresponding to given display coordinates.
-
-        Internally the board is a 2x16 grid, the display board is 3x8.
-
-        Args:
-            h_display: The display height coordinate.
-            w_display: The display width coordinate.
-
-        Returns:
-            Tuple (h, w).
-        """
-        if h_display == 1:  # middle row
-            h = self.game.turn
-            w = w_display + self.game.mid_start
-        else:
-            h = h_display // 2
-            if w_display < self.game.mid_start:
-                w = self.game.mid_start - 1 - w_display
-            else:
-                w = self.game.mid_ended - (w_display - (self.game.display_width - 1))
-
-        return h, w
 
 
 class Roll:

@@ -7,8 +7,14 @@ import pickle
 
 
 class TDUr:
-    """A value based agent for playing Ur."""
+    """A value based agent for playing Ur.
 
+    Attributes:
+        input_units: The number of input units of the value network.
+        hidden_units: The number of hidden units of the value network.
+        params: The parameters of the value network.
+        key: A jax random key.
+    """
     def __init__(self, hidden_units=40, key=random.PRNGKey(42)):
         """Construct a TD-Ur agent.
 
