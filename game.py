@@ -50,31 +50,31 @@ class Ur:
         self.finish = 15
         self.rosettes = (4, 8, 14)
         self.safe_square = 8
-        self.mid_start = 5
-        self.mid_ended = 13
-        self.board_width_internal = 16
+        self._mid_start = 5
+        self._mid_ended = 13
+        self._board_width_internal = 16
 
         # piece
-        self.n_pieces = 7
+        self._n_pieces = 7
 
         # to pass to jitted functions
-        self.board_params = (self.start, self.finish, self.rosettes, self.safe_square, self.mid_start, self.mid_ended,
-                             self.board_width_internal, self.n_pieces)
+        self._board_params = (self.start, self.finish, self.rosettes, self.safe_square, self._mid_start, self._mid_ended,
+                              self._board_width_internal, self._n_pieces)
 
         # die
-        self.n_die = 4
-        self.die_faces = 2
+        self._n_die = 4
+        self._die_faces = 2
         self.rolls = np.arange(5)
         self.probabilities = np.array([1, 4, 6, 4, 1]) / 16
 
         # display
-        self.display_width = 8
+        self._display_width = 8
 
         # jitted function
         self._get_new_boards = jit(vmap(self._get_new_board, in_axes=(None, None, 0, None, None)), static_argnums=0)
 
         # state
-        self.rolled = self.turn = self.winner = self.board = self.move_count = self.backup_state = None
+        self.rolled = self.turn = self.winner = self.board = self.move_count = self._backup_state = None
         self.reset()
 
     def reset(self):
@@ -82,15 +82,15 @@ class Ur:
         self.turn = 0
         self.winner = -1
         self.board = np.zeros(shape=(2, self.finish + 1), dtype=np.int8)
-        self.board[0, self.start] = self.n_pieces
-        self.board[1, self.start] = self.n_pieces
+        self.board[0, self.start] = self._n_pieces
+        self.board[1, self.start] = self._n_pieces
 
         self.move_count = 0
         self._roll()
 
     def _roll(self):
         """Roll the dice, store result in attribute `rolled`."""
-        self.rolled = np.sum(np.random.randint(self.die_faces, size=self.n_die))
+        self.rolled = np.sum(np.random.randint(self._die_faces, size=self._n_die))
 
     def legal_moves(self):
         """Return a list of legal moves.
@@ -103,7 +103,7 @@ class Ur:
         if self.rolled == 0:
             moves = []
         else:
-            moves_array = self._legal_moves_array(self.board_params, self.board, self.turn, self.rolled)
+            moves_array = self._legal_moves_array(self._board_params, self.board, self.turn, self.rolled)
             moves = np.where(moves_array)[0].tolist()
         return moves if moves else ['pass']
 
@@ -124,7 +124,7 @@ class Ur:
             self._change_turn()
             self._roll()
         else:
-            new_board, new_turn, new_winner = self._get_new_board(self.board_params,
+            new_board, new_turn, new_winner = self._get_new_board(self._board_params,
                                                                   self.board, move, self.rolled, self.turn)
 
             self.board = np.array(new_board)
@@ -175,11 +175,11 @@ class Ur:
 
     def backup(self):
         """Store the current state of the game in the attribute `backup_state`."""
-        self.backup_state = self.get_state()
+        self._backup_state = self.get_state()
 
     def restore_backup(self):
         """Restore the current state of the game from the attribute `backup_state`."""
-        self.board, self.turn, self.rolled, self.winner, self.move_count = self.backup_state
+        self.board, self.turn, self.rolled, self.winner, self.move_count = self._backup_state
 
     def simulate_moves(self, moves):
         """Give afterstates resulting from moves.
@@ -192,7 +192,7 @@ class Ur:
         Returns:
             A list of tuples (board, turn, winner), one for each move.
         """
-        return self._get_new_boards(self.board_params, self.board, jnp.array(moves), self.rolled, self.turn)
+        return self._get_new_boards(self._board_params, self.board, jnp.array(moves), self.rolled, self.turn)
 
     @staticmethod
     @partial(jit, static_argnums=(0, 2, 3))
@@ -293,27 +293,27 @@ class Ur:
             return 'less than 0 stones on square'
 
         for player in [0, 1]:
-            if jnp.sum(board[player, self.start: self.finish + 1]) != self.n_pieces:
+            if jnp.sum(board[player, self.start: self.finish + 1]) != self._n_pieces:
                 return f'number of pieces not conserved (player {player})'
-            if not (0 <= board[player, self.start] <= self.n_pieces):
+            if not (0 <= board[player, self.start] <= self._n_pieces):
                 return f'illegal start pieces (player {player})'
-            if not (0 <= board[player, self.finish] <= self.n_pieces):
+            if not (0 <= board[player, self.finish] <= self._n_pieces):
                 return f'illegal finish pieces (player {player})'
 
-        overlap_board = board[:, self.mid_start:self.mid_ended]
-        if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self.mid_ended - self.mid_start, dtype='int8')).all():
+        overlap_board = board[:, self._mid_start:self._mid_ended]
+        if not (jnp.sum(overlap_board, axis=0) <= jnp.ones(self._mid_ended - self._mid_start, dtype='int8')).all():
             return 'overlapping stones'
 
         if self.winner != -1:
-            if board[self.winner, self.finish] != self.n_pieces:
+            if board[self.winner, self.finish] != self._n_pieces:
                 return "winner hasn't finished yet"
-            if board[(self.winner + 1) % 2, self.finish] == self.n_pieces:
+            if board[(self.winner + 1) % 2, self.finish] == self._n_pieces:
                 return "loser has won before winner"
         return True
 
     def in_middle(self, w):
         """Return true if given internal width coordinate is on the middle row in the display board."""
-        return self.mid_start <= w < self.mid_ended
+        return self._mid_start <= w < self._mid_ended
 
     def transform_to_display(self, h, w):
         """Return display coordinates corresponding to given internal coordinates.
@@ -327,14 +327,14 @@ class Ur:
         Returns:
             Tuple (h_display, w_display).
         """
-        if w < self.mid_start:
-            w_display = self.mid_start - 1 - w
+        if w < self._mid_start:
+            w_display = self._mid_start - 1 - w
             h_display = 2 * h
-        elif w >= self.mid_ended:
-            w_display = (self.display_width - 1) - (w - self.mid_ended)
+        elif w >= self._mid_ended:
+            w_display = (self._display_width - 1) - (w - self._mid_ended)
             h_display = 2 * h
         else:
-            w_display = w - self.mid_start
+            w_display = w - self._mid_start
             h_display = 1
 
         return h_display, w_display
@@ -353,13 +353,13 @@ class Ur:
         """
         if h_display == 1:  # middle row
             h = self.turn
-            w = w_display + self.mid_start
+            w = w_display + self._mid_start
         else:
             h = h_display // 2
-            if w_display < self.mid_start:
-                w = self.mid_start - 1 - w_display
+            if w_display < self._mid_start:
+                w = self._mid_start - 1 - w_display
             else:
-                w = self.mid_ended - (w_display - (self.display_width - 1))
+                w = self._mid_ended - (w_display - (self._display_width - 1))
 
         return h, w
 
@@ -370,19 +370,19 @@ class Ur:
 
         cmap = colors.ListedColormap(['b', 'w', 'r', 'y'])
 
-        plt.imshow(board_display, cmap=cmap, extent=(0, self.display_width, 3, 0), vmin=-1, vmax=3)
+        plt.imshow(board_display, cmap=cmap, extent=(0, self._display_width, 3, 0), vmin=-1, vmax=3)
         self._annotate_board()
 
     def _reshape_board(self):
         """Turn the internal 2x16 board into the conventional 3x8 shape."""
-        reshaped_board = np.zeros(shape=(3, self.display_width), dtype=np.int8) + 3
-        reshaped_board[1] = (self.board[0, self.mid_start:self.mid_ended] -
-                             self.board[1, self.mid_start:self.mid_ended])
+        reshaped_board = np.zeros(shape=(3, self._display_width), dtype=np.int8) + 3
+        reshaped_board[1] = (self.board[0, self._mid_start:self._mid_ended] -
+                             self.board[1, self._mid_start:self._mid_ended])
         for player in [0, 1]:
             sign = (1 - 2 * player)
-            reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self.mid_start])
-            reshaped_board[2 * player, -(self.finish - self.mid_ended):] = sign * np.flip(
-                self.board[player, self.mid_ended:-1])
+            reshaped_board[2 * player, :4] = sign * np.flip(self.board[player, 1:self._mid_start])
+            reshaped_board[2 * player, -(self.finish - self._mid_ended):] = sign * np.flip(
+                self.board[player, self._mid_ended:-1])
         return reshaped_board
 
     def _annotate_board(self):
@@ -392,7 +392,7 @@ class Ur:
         stats = [self.board[ij] for ij in [(0, self.start), (0, self.finish), (1, self.start), (1, self.finish)]]
         player_colors = ['r', 'r', 'b', 'b']
         x_start = 4
-        x_finish = self.display_width - (self.finish + 1 - self.mid_ended)
+        x_finish = self._display_width - (self.finish + 1 - self._mid_ended)
         positions = [(x_start, 0), (x_finish, 0), (x_start, 2), (x_finish, 2)]
         for s, c, (x, y) in zip(stats, player_colors, positions):
             plt.text(x + .3, y + .7, f'{s}', fontsize=24, color=c)
@@ -406,7 +406,7 @@ class Ur:
 
         # make it pretty
         ax = plt.gca()
-        ax.set_xticks(np.arange(0, self.display_width + 1, 1))
+        ax.set_xticks(np.arange(0, self._display_width + 1, 1))
         ax.set_yticks(np.arange(0, 3 + 1, 1))
         ax.grid(color='black', linewidth=5, fillstyle='full')
         ax.tick_params(labelbottom=False, labelleft=False, color='w')
