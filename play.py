@@ -132,6 +132,22 @@ class InteractiveGame:
             move = self.agent.policy(self.game, plies=self.search_plies)
             self._play_and_update(move)
 
+    def start_new_game(self, button):
+        if not self.game.has_finished():
+            self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
+        else:
+            self.game.reset()
+            self.human = (self.human + 1) % 2
+            self.update()
+            if self.options.auto_play:
+                self._do_auto_play()
+
+    def update(self):
+        self.roll.update()
+        self.players.update()
+        self.messages.clear()
+        self.board.update()
+
     def _play_and_update(self, move):
         """Given a legal move, this plays it on the internal board, and updates all affected buttons."""
         game = self.game
@@ -157,22 +173,6 @@ class InteractiveGame:
             ipyw.widgets.interaction.show_inline_matplotlib_plots()
 
         self._do_auto_play()
-
-    def start_new_game(self, button):
-        if not self.game.has_finished():
-            self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
-        else:
-            self.game.reset()
-            self.human = (self.human + 1) % 2
-            self.update()
-            if self.options.auto_play:
-                self._do_auto_play()
-
-    def update(self):
-        self.roll.update()
-        self.players.update()
-        self.messages.clear()
-        self.board.update()
 
     def _do_auto_play(self):
         while self.options.auto_play and self.game.turn != self.human and not self.game.has_finished():
