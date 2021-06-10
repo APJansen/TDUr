@@ -106,9 +106,10 @@ class InteractiveGame:
         self.scores = Scores(style=self.style)
         self.labels = Labels(style=self.style)
 
-        self.game_interface = self._create_interface()
+        self.game_interface = self._make_interface()
 
-    def _create_interface(self):
+    def _make_interface(self):
+        """Return the interface for the interactive game."""
         interface = ipyw.VBox(children=[
             self.labels.grid,
             ipyw.HBox(children=[self.board.grid, self.roll.grid, self.players.grid]),
@@ -117,22 +118,44 @@ class InteractiveGame:
         return interface
 
     def play_move(self, button, move, h_display):
+        """Play the given move in the game, if legal, and update the interface.
+
+        Args:
+            button: Dummy argument necessary for ipywidgets.
+            move: The move, in internal coordinates.
+            h_display: The height of the button pressed.
+        """
         is_legal_move = self._handle_move_errors(move, h_display)
         if is_legal_move:
             self._play_and_update(move)
 
     def play_pass(self, button):
+        """Pass, if legal, and update the interface.
+
+        Args:
+            button: Dummy argument necessary for ipywidgets.
+        """
         if self._check_turn(is_human=True) and 'pass' in self.game.legal_moves():
             self._play_and_update('pass')
         else:
             self.messages.display_error("You shall not pass!", "You have a legal move")
 
     def play_agent(self, button):
+        """Let the agent make a move, if it is its turn.
+
+        Args:
+            button: Dummy argument necessary for ipywidgets.
+        """
         if self._check_turn(is_human=False):
             move = self.agent.policy(self.game, plies=self.search_plies)
             self._play_and_update(move)
 
     def start_new_game(self, button):
+        """Reset the game and start a new one, if the current is finished.
+
+        Args:
+            button: Dummy argument necessary for ipywidgets.
+        """
         if not self.game.has_finished():
             self.messages.display_error("Game not yet finished!", "Finish this one before starting next.")
         else:
@@ -143,13 +166,18 @@ class InteractiveGame:
                 self._do_auto_play()
 
     def update(self):
+        """Update everything in the interface."""
         self.roll.update()
         self.players.update()
         self.messages.clear()
         self.board.update()
 
     def _play_and_update(self, move):
-        """Given a legal move, this plays it on the internal board, and updates all affected buttons."""
+        """Given a legal move, this plays it on the internal board, and updates all affected buttons.
+
+        Args:
+            move: The move to play.
+            """
         game = self.game
         self.messages.clear()
         if move == 'pass':
@@ -175,6 +203,7 @@ class InteractiveGame:
         self._do_auto_play()
 
     def _do_auto_play(self):
+        """Let the agent make moves until it is no longer allowed to."""
         while self.options.auto_play and self.game.turn != self.human and not self.game.has_finished():
             time.sleep(1)
             # ipywidget actions have to take the button itself as argument, but none of the actions here depend on it
@@ -183,6 +212,15 @@ class InteractiveGame:
             self.play_agent(dummy_button)
 
     def _handle_move_errors(self, move, h_display):
+        """Return boolean indicating the legality of the move, and if illegal print the reason.
+
+        Args:
+            move: The move being played.
+            h_display: The height of the clicked button.
+
+        Returns:
+            Boolean indicating if the move is legal.
+        """
         game = self.game
 
         if not self._check_turn(is_human=True):
@@ -211,6 +249,14 @@ class InteractiveGame:
         return is_legal
 
     def _check_turn(self, is_human):
+        """Return True if it is the turn of the player indicated by `is_human`, and the game has not finished.
+
+        Args:
+            is_human: `True` to ask if it is the human's turn, `False` otherwise.
+
+        Returns:
+            Boolean.
+        """
         if self.game.has_finished():
             self.messages.display_error("The game has finished!", "Click New Game to start a new one.")
             return False
@@ -270,11 +316,21 @@ class Board:
                 grid[self._transform_to_display(h, w)].add_class("rosette_style")
 
     def update(self):
+        """Update all buttons in the board grid."""
         for h_display in range(self.board_height):
             for w_display in range(self.board_width):
                 self._update_square(h_display, w_display)
 
     def update_affected_squares(self, turn, move, rolled):
+        """Update only those buttons that could have been affected by the move.
+
+        Called after the internal board has been updated.
+
+        Args:
+            turn: Integer, 0 or 1, indicating which player made the move.
+            move: The move played.
+            rolled: The die roll.
+        """
         _, w_display_before = self._transform_to_display(turn, move)
         _, w_display = self._transform_to_display(turn, move + rolled)
 
@@ -284,12 +340,16 @@ class Board:
         self._update_starts()
 
     def _update_starts(self):
+        """Update starting squares."""
         for h_display in [0, 2]:
             self._update_square(h_display, self.w_display_start)
 
     def _update_square(self, h_display, w_display):
-        """Updates button color/number, after the internal board has been updated, but with the turn argument
-        being the turn before it was updated, so the identity of the player who last moved.
+        """Update the board square specified.
+
+        Args:
+            h_display: The display board height coordinate.
+            w_display: The display board width coordinate.
         """
         game = self.game
 
@@ -323,39 +383,70 @@ class Board:
             button.style = {'button_color': color}
 
     def _make_play_move_button(self, h_display, w_display):
+        """Return ipywidgets Button that moves the stone on the button when clicked.
+
+        The button is given its display and internal coordinates as attributes.
+
+        Args:
+            h_display: The display board height coordinate of the button.
+            w_display: The display board width coordinate of the button.
+
+        Returns:
+            An instance of the ipywidgets.Button class.
+        """
         h, w = self._transform_to_internal(h_display, w_display)
         btn_play = make_button('', 'white', action=partial(self.interface.play_move, move=w, h_display=h_display))
         btn_play.display_coords = (h_display, w_display)
         btn_play.coords = h, w
         return btn_play
 
-    def _transform_to_display(self, i, j):
-        """Go from internal board representation coordinates (2x16) to displayed board (3x8) coordinates"""
-        if j < self.game.mid_start:
-            j_display = self.game.mid_start - 1 - j
-            i_display = 2 * i
-        elif j >= self.game.mid_ended:
-            j_display = (self.game.display_width - 1) - (j - self.game.mid_ended)
-            i_display = 2 * i
-        else:
-            j_display = j - self.game.mid_start
-            i_display = 1
+    def _transform_to_display(self, h, w):
+        """Return display coordinates corresponding to given internal coordinates.
 
-        return i_display, j_display
+        Internally the board is a 2x16 grid, the display board is 3x8.
 
-    def _transform_to_internal(self, i, j):
-        """Go from to displayed board (3x8) coordinates to internal board representation coordinates (2x16)"""
-        if i == 1:  # middle row
-            i_internal = self.game.turn
-            j_internal = j + self.game.mid_start
+        Args:
+            h: The internal height coordinate.
+            w: The internal width coordinate.
+
+        Returns:
+            Tuple (h_display, w_display).
+        """
+        if w < self.game.mid_start:
+            w_display = self.game.mid_start - 1 - w
+            h_display = 2 * h
+        elif w >= self.game.mid_ended:
+            w_display = (self.game.display_width - 1) - (w - self.game.mid_ended)
+            h_display = 2 * h
         else:
-            i_internal = i // 2
-            if j < self.game.mid_start:
-                j_internal = self.game.mid_start - 1 - j
+            w_display = w - self.game.mid_start
+            h_display = 1
+
+        return h_display, w_display
+
+    def _transform_to_internal(self, h_display, w_display):
+        """Return internal coordinates corresponding to given display coordinates.
+
+        Internally the board is a 2x16 grid, the display board is 3x8.
+
+        Args:
+            h_display: The display height coordinate.
+            w_display: The display width coordinate.
+
+        Returns:
+            Tuple (h, w).
+        """
+        if h_display == 1:  # middle row
+            h = self.game.turn
+            w = w_display + self.game.mid_start
+        else:
+            h = h_display // 2
+            if w_display < self.game.mid_start:
+                w = self.game.mid_start - 1 - w_display
             else:
-                j_internal = self.game.mid_ended - (j - (self.game.display_width - 1))
+                w = self.game.mid_ended - (w_display - (self.game.display_width - 1))
 
-        return i_internal, j_internal
+        return h, w
 
 
 class Roll:
@@ -370,6 +461,7 @@ class Roll:
         self.grid[2, 0] = make_button('', self.style['yellow'], css_style="blue_font")
 
     def update(self):
+        """Update roll and turn information."""
         self.grid[2 * self.game.other(), 0].description = ' '
         self.grid[2 * self.game.turn, 0].description = f'{self.game.rolled}'
 
@@ -388,6 +480,7 @@ class Players:
                                       action=self.interface.play_agent)
 
     def update(self):
+        """Update player information."""
         human = self.interface.human
         ai = (human + 1) % 2
 
@@ -416,6 +509,11 @@ class Options:
                                                          css_style="button_font", action=self.toggle_auto_play)
 
     def toggle_auto_play(self, button):
+        """Toggle the auto-play option.
+
+        Args:
+            button: Dummy argment necessary for ipywidgets.
+        """
         if self.auto_play:
             self.auto_play = False
             self.grid[self.auto_play_index, :].description = 'auto-play: off'
@@ -444,6 +542,7 @@ class Scores:
         self.grid[self.agent_h, -1] = make_label('0')
 
     def update(self, winner, human):
+        """Update the score information."""
         if winner == human:
             self.values[0] += 1
         else:
@@ -465,14 +564,22 @@ class Messages:
         self.grid[self.detail_index, :] = make_label(' ', css_style="detailed_message_style")
 
     def display_error(self, message, details):
+        """Display the given error message.
+
+        Args:
+            message: The main error.
+            details: Possible further explanation.
+        """
         self.grid[self.main_index, :].value = message
         self.grid[self.detail_index, :].value = details
 
     def clear(self):
+        """Clear any error messages."""
         self.grid[self.main_index, :].value = ''
         self.grid[self.detail_index, :].value = ''
 
     def display_result(self, winner, human):
+        """Display the winner of the game."""
         if winner == human:
             self.display_error("You won this game!", "Congratulations!")
         else:
@@ -497,6 +604,17 @@ class Labels:
 
 
 def make_empty_grid(style, cells_high, cells_wide, square=False):
+    """Return an ipywidgets grid.
+
+    Args:
+        style: Dictionary containing keys `'cell_width'` and `'cell_height'`.
+        cells_high: How many rows of cells to create.
+        cells_wide: How many columns of cells to create.
+        square: Optional, will set `'cell_height'` to `'cell_width'` if True, defaults to False.
+
+    Returns:
+        An instance of ipywidgets.GridspecLayout.
+    """
     cell_width = style['cell_width']
     cell_height = cell_width if square else style['cell_height']
     return ipyw.GridspecLayout(cells_high, cells_wide,
@@ -505,6 +623,17 @@ def make_empty_grid(style, cells_high, cells_wide, square=False):
 
 
 def make_button(description, color, css_style="", action=None):
+    """Return an ipywidgets Button.
+
+    Args:
+        description: The text on the button.
+        color: The color of the button (rgb string).
+        css_style: The css style to use for the button.
+        action: The action for the button, a function.
+
+    Returns:
+        An instance of ipywidgets.Button.
+    """
     button = ipyw.Button(description=description, style={'button_color': color},
                          layout=ipyw.Layout(height='auto', width='auto'))
     if css_style:
@@ -515,6 +644,15 @@ def make_button(description, color, css_style="", action=None):
 
 
 def make_label(description, css_style="label_font"):
+    """Return an ipywidgets Label.
+
+    Args:
+        description: The text to put in the label.
+        css_style: The css style to use.
+
+    Returns:
+        An instance of ipywidgets.Label.
+    """
     label = ipyw.Label(description, layout=ipyw.Layout(height='auto', width='auto'))
     if css_style:
         label.add_class(css_style)
