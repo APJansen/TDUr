@@ -58,8 +58,8 @@ class Ur:
         self._n_pieces = 7
 
         # to pass to jitted functions
-        self._board_params = (self.start, self.finish, self.rosettes, self.safe_square, self._mid_start, self._mid_ended,
-                              self._board_width_internal, self._n_pieces)
+        self._board_params = (self.start, self.finish, self.rosettes, self.safe_square, self._mid_start,
+                              self._mid_ended, self._board_width_internal, self._n_pieces)
 
         # die
         self._n_die = 4
@@ -263,11 +263,8 @@ class Ur:
         capture_board = jnp.zeros(shape=board_width_internal, dtype='int8')
         capture_board = index_update(capture_board, (index[mid_start:mid_ended]), 1)
 
-        # change turn, unless ending on a rosette
-        other = (turn + 1) % 2
-        new_turn = (turn + 1 + rosette_board[end]) % 2
-
         # capture, if opponent present and in capturable area
+        other = (turn + 1) % 2
         indices_x, indices_y = indices_x + [other, other], indices_y + [end, start]
         values = values + [(1 - capture_board[end]) * board[other, end],
                            board[other, start] + capture_board[end] * board[other, end]]
@@ -276,6 +273,9 @@ class Ur:
 
         not_finished = jnp.sign(n_pieces - new_board[turn, finish])
         new_winner = not_finished * -1 + (1 - not_finished) * turn
+
+        # change turn, unless ending on a rosette
+        new_turn = (turn + 1 + rosette_board[end]) % 2
 
         return new_board, new_turn, new_winner
 

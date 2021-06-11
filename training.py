@@ -32,7 +32,7 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
     if custom_name:
         name = custom_name
     else:
-        name = compose_name(agent, learning_rate, epsilon, lmbda, learning_rate_decay, search_plies)
+        name = compose_name(agent.hidden_units, learning_rate, epsilon, lmbda, learning_rate_decay, search_plies)
 
     for episode in range(episode_start, episode_start + episodes + 1):
         game.reset()
@@ -68,8 +68,8 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
         if episode % iprint == 0 and episode > episode_start:
             end = time.time()
             print(f'episodes: {episode}; red wins: {red_wins:d}; time: '
-                  f'{(end - start) / total_moves * 1000:.2f} s/(1k moves) ({end-start:.1f}s tot); '
-                  f'{total_moves/iprint:.0f} moves per game.')
+                  f'{(end - start) / total_moves * 1000:.2f} s/(1k moves) ({end - start:.1f}s tot); '
+                  f'{total_moves / iprint:.0f} moves per game.')
             start = end
             total_moves = 0
             red_wins = 0
@@ -120,9 +120,9 @@ def update_eligibility(eligibility, scalar, grad_value):
     return [(scalar * z_w + dv_dw, scalar * z_b + dv_db) for (z_w, z_b), (dv_dw, dv_db) in zip(eligibility, grad_value)]
 
 
-def compose_name(agent, learning_rate, epsilon, lmbda, lr_decay, search_plies=1):
+def compose_name(hidden_units, learning_rate, epsilon, lmbda, lr_decay, search_plies=1):
     """Return name for parameter save file based on the hyperparameters."""
-    name = f'N{agent.hidden_units:d}'
+    name = f'N{hidden_units:d}'
     name += f'-alpha{learning_rate:.3f}'
     name += f'-lambda{lmbda:.2f}'
     name += f'-epsilon{epsilon:.5f}'
