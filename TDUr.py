@@ -135,6 +135,7 @@ class TDUr:
             values = np.zeros(shape=len(moves))
             for i, (board, turn, win) in enumerate(zip(boards, turns, wins)):
                 if win != -1:
+                    # if already won after 1 ply, no need to go further
                     values[i] = self.value(board, turn)
                 else:
                     roll_values = np.zeros(shape=len(game.rolls))

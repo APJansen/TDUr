@@ -126,18 +126,17 @@ class Ur:
         else:
             new_board, new_turn, new_winner = self._get_new_board(self._board_params,
                                                                   self.board, move, self.rolled, self.turn)
-
+            # need to convert from DeviceArray
             self.board = np.array(new_board)
+            self.winner = int(new_winner)
+            self.turn = int(new_turn)
 
-            if new_winner != -1:
-                self.winner = self.turn
-            else:
-                self.turn = int(new_turn)  # need to convert from DeviceArray
+            if not self.has_finished():
                 self._roll()
 
     def _change_turn(self):
         """Change turn, stored in attribute `turn`."""
-        self.turn = (self.turn + 1) % 2
+        self.turn = self.other()
 
     def other(self):
         """Return the number of the player whose turn it is not."""
@@ -271,11 +270,12 @@ class Ur:
 
         new_board = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
 
-        not_finished = jnp.sign(n_pieces - new_board[turn, finish])
-        new_winner = not_finished * -1 + (1 - not_finished) * turn
+        has_finished = 1 + jnp.sign(new_board[turn, finish] - n_pieces)
+        # if the played move won the game, the winner must be the player who played it
+        new_winner = has_finished * turn + (1 - has_finished) * -1
 
-        # change turn, unless ending on a rosette
-        new_turn = (turn + 1 + rosette_board[end]) % 2
+        # change turn, unless ending on a rosette or game finished
+        new_turn = ((turn + 1) + rosette_board[end] + has_finished) % 2
 
         return new_board, new_turn, new_winner
 

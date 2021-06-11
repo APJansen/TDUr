@@ -36,20 +36,17 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
 
     for episode in range(episode_start, episode_start + episodes + 1):
         game.reset()
-        finished = False
         eligibility = init_eligibility(agent.input_units, agent.hidden_units)
 
         new_value = agent.value(game.board, game.turn)
 
-        while not finished:
+        while not game.has_finished():
             value = new_value
             grad_value = agent.value_gradient(game.board, game.turn)
 
             move = agent.policy(game, epsilon=epsilon, plies=search_plies)
             game.play_move(move)
 
-            # no matter who's playing, we always want to estimate the probability of winning of player 0
-            # the only point where turn number should enter is in choosing the next move, which is max/min on that
             reward = game.reward()
             new_value = agent.value(game.board, game.turn)
 
@@ -58,10 +55,8 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
             agent.update_params(learning_rate * TD_error, eligibility)
 
-            if game.has_finished():
-                finished = True
-                red_wins += 1 - game.winner
-                total_moves += game.move_count
+        red_wins += 1 - game.winner
+        total_moves += game.move_count
 
         learning_rate *= learning_rate_decay
 

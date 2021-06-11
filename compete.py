@@ -19,7 +19,7 @@ def compete_policies(game, agent_1, agent_2, episodes=1_000, search_plies_1=1, s
         game.reset()
         player_1 = episode % 2
 
-        while game.winner == -1:
+        while not game.has_finished():
             if game.turn == player_1:
                 move = agent_1.policy(game, epsilon=0, plies=search_plies_1)
             else:
