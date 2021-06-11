@@ -333,3 +333,5 @@ The other hyperparameters, the learning rate, lambda and the exploration paramet
 The value of 0 for epsilon also seems reasonable since the randomness of the die rolls already gives rise to exploration of different states.
 Finally the values of the learning rate and the TD parameter lambda are commonly chosen values as well.
 
+TODO: add experiment on search depth
+
