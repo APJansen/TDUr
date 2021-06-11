@@ -209,14 +209,14 @@ We do this using _Temporal Difference (TD) Learning_, whose basic premise is tha
 The logic is that a. they are closer to the final win/loss state, and b. they have experienced more environment dynamics.
 In the extreme case, the game has finished and we know the outcome.
 
----TODO: work in bootstrapping
-
 So what we can do is compute the value of the current state, ![equation](https://latex.codecogs.com/gif.latex?v(S_t)), and then take a step (using the policy whose value we're estimating), and compute the value ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})) there.
-Assuming that the latter is more accurate, we want to update our estimate to move ![equation](https://latex.codecogs.com/gif.latex?v(S_t)) closer to ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})). In other words we want to minimize ![equation](https://latex.codecogs.com/gif.latex?(v(S_t&plus;1)&space;-&space;v(S_t))^2), but only through ![equation](https://latex.codecogs.com/gif.latex?v(S_t)). Now v is a neural network, parametrized by weights w, so we can do this using gradient descent, resulting in the weight update
+Assuming that the latter is more accurate, we want to update our estimate to move ![equation](https://latex.codecogs.com/gif.latex?v(S_t)) closer to ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})). In other words we want to minimize ![equation](https://latex.codecogs.com/gif.latex?(v(S_{t&plus;1})&space;-&space;v(S_t))^2), but only through ![equation](https://latex.codecogs.com/gif.latex?v(S_t)). Now v is a neural network, parametrized by weights w, so we can do this using gradient descent, resulting in the weight update
 
 ![equation](https://latex.codecogs.com/gif.latex?w_{t&plus;1}&space;=&space;w_t&space;&plus;&space;\alpha&space;(R_{t&plus;1}&space;&plus;&space;v(S_{t&plus;1})&space;-&space;v(S_t))&space;\nabla_w&space;v(S_t))
 <!-- w_{t+1} = w_t + \alpha (R_{t+1} + v(S_{t+1}) - v(S_t)) \nabla_w v(S_t) -->
 This is called _semi-gradient descent_ because we keep the future estimate fixed. This is very important, if we do not do this we are not making use of the fact that future estimates are more accurate than present estimates.
+
+It is also an example of _boostrapping_: improving our estimate of the optimal value function based on earlier estimates.
 
 <a name="eligibility" />
 
@@ -236,6 +236,8 @@ When lambda is 0 we recover the previous 1-step TD, where only the last actions 
 At the other extreme when lambda is 1, all previous actions are held equally responsible, this is called Monte Carlo learning.
 Moves clearly can have a longer term effect, but at the same time the random element in the game will wash out their influence over time. 
 So the optimal value is somewhere in between.
+
+It is important to re-initialize the eligibility trace to zero at the start of each training game, as no weights have any responsibility for creating the starting state.
 
 <a name="srch"/>
 
