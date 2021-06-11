@@ -27,7 +27,7 @@ It was played from around 2.500 BC until late antiquity, when it was replaced or
 ## Video Introduction by Irving Finkel
 
 For an introduction to both the history and the rules of the game, I highly recommend this very entertaining YouTube video.
-In this video, dr. Irving Finkel, curator of the British Museum and the discoverer and translator of a clay tablet from 177 BC describing the rules of the game,
+In this video, dr. Irving Finkel, curator of the British Museum and the translator of a clay tablet from 177 BC describing the rules of the game,
 explains the rules and history of the game, and plays a game against popular youtuber Tom Scott.
 
 [![Alt text](https://img.youtube.com/vi/WZskjLq040I/0.jpg)](https://www.youtube.com/watch?v=WZskjLq040I)
@@ -45,21 +45,22 @@ Each player starts with 7 stones, as indicated on the start square.
 The crosses correspond to the "rosettes" on the original board, and have a special function as explained below.
 
 The goal of the game is to be the first to bring all 7 stones from the start to the finish. Stones move along the route indicated in the image below.
-The middle row is where the routes overlap and so where players can capture eachother's stones.
+The middle row is where the routes overlap and players can capture eachother's stones.
 
 ![plot](./images/UrBoardRoutes.png)
 
 Players throw 4 tetrahedral dice with 2 corners each marked. The number of marked corners pointing up is the number of squares a single stone can be moved.
 This is nothing but a fancy way of tossing 4 coins and counting the number of heads.
-So the choice to make at each turn is which of your stones to move, assuming multiple moves are possible, which is not always the case.
 
+The choice to make at each turn is which of your stones to move, assuming multiple moves are possible, which is not always the case.
 A stone may move the rolled number of squares, _unless_ the destination square:
 - is occupied by a stone of the same player
-- is a rosette (marked with X) occupied by the opponent
+- is a rosette (marked with a cross) occupied by the opponent
 - is off the board, to finish one must land exactly on the finish
 
-When moving to a square occupied by the opponent, the opponent's stone is captured and moved back to the start.
-When moving to a rosette square, the player gets another turn. Otherwise the turn transfers to the opponent.
+The movement of a stone has the following consequences:
+- When moving to a square occupied by the opponent, the opponent's stone is captured and moved back to the start.
+- When moving to a rosette square, the player gets another turn. Otherwise the turn transfers to the opponent.
 
 Finally, when a player has no legal moves, or a 0 is thrown, they must pass. Passing is only allowed when there are no legal moves.
 
@@ -100,6 +101,7 @@ There are 4 available moves
 - b2 moves that stone closer to the finish and reduces its chance of being captured
 - g3 moves that stone to the finish
 - e3 puts another stone on the board
+- 
 Considerations are similar here to the other board, b3 could turn out very well if the next throw is good, but we could also throw a 0, or even a 2 would be bad.
 Moving g3 to the finish might not seem most urgent, but only a rather rare throw of 1 can do this, so if we postpone it for too long we might end up with our last stone stuck there.
 
@@ -109,12 +111,14 @@ TD-Ur chose to move g4 to the finish.
 
 # TD-Ur
 
-We present an AI that plays Ur at human level.
 Ur's successor Backgammon was the first game in which human experts were surpassed by a learned AI, called [TD-Gammon](https://www.csd.uwo.ca/~xling/cs346a/extra/tdgammon.pdf) by Tesauro.
-Since Ur is thought to be a simpler predecessor of Backgammon, it seems appropriate and sufficient to use the techniques of TD-Gammon for Ur, resulting in the TD-Ur presented here. 
-The essential techniques are using a neural network to parametrize a value function, which is learned using TD(lambda) and a 2-ply lookahead.
+Since Ur is thought to be a simpler predecessor of Backgammon, it seems appropriate and sufficient to use the techniques of TD-Gammon for Ur, resulting in the TD-Ur presented here.
 
-If this means nothing to you, what follows is a quick explanation.
+--TODO: add comment about performance
+
+The essential techniques are using a neural network to parametrize a value function, which is learned using TD(lambda) and a 2-ply lookahead search.
+
+If this means nothing to you, what follows is a basic explanation of all the techniques used.
 For more detail I recommend the book [Reinforcement Learning: An Introduction](http://incompleteideas.net/book/the-book-2nd.html), by Sutton and Barto, and these [video lectures](https://www.youtube.com/watch?v=2pWv7GOvuf0&list=PLqYmG7hTraZDM-OYHWgPebj2MfCFzFObQ) by David Silver.
 
 <a name="rl"/>
@@ -144,7 +148,7 @@ The goal of a reinforcement learning agent is to maximize the sum of its rewards
 To maximize the return, or win probability, rather than engineering by hand, using our own knowledge of the game, complicated rules on what actions to take, in the reinforcement learning paradigm, we let the agent learn how to do it for itself.
 This often involves having the agent learn a _value function_, an estimate of the expected return in the current state, or the win probability in our case.
 This value function can be allowed to depend only on the current state, or also on the chosen action, when it's called an action value.
-For games such as this where the transition to a new state can be decomposed into first a deterministic part and then a probabilistic part, it is convenient to choose a middle ground, namely the afterstate. So the input to our value function will be the board configuration and whose turn it is, but it does not include the dice roll, and it's not necessarily the agent's turn.
+For games such as this where the transition to a new state can be decomposed into first a deterministic part and then a probabilistic part, it is convenient to choose a middle ground, namely the afterstate. So the input to our value function will be the board configuration and whose turn it is, but it does not include the next roll of the dice.
 
 Given such an afterstate s_a obtained from the deterministic part of the transition after taking action a in state s, we want to learn to estimate a number
 ![equation](https://latex.codecogs.com/svg.latex?0%20%5Cleq%20v%28s_a%29%20%5Cleq%201%7B%5Ccolor%7BDarkOrange%7D%20%7D) <!-- 0 <= v(s_a) <= 1 -->
@@ -163,7 +167,7 @@ For both players each of the 7 stones can be in one of 4 groups of squares:
 - the middle row: ![equation](https://latex.codecogs.com/gif.latex?m_r)
 
 Naming these as indicated above, with the subscript r indicating the red player's stones and similarly with subscript b for blue, we obtain the total number of afterstates as follows.
-We sum over the number of stones at the start for both players, from 0 to 7, over the number of stones at the finish, again for both players from 0 up to 7 - their respective start numbers. Then for both players over the number of stones in the home row from 0 to 6 - (stones at start or finish) (to a maximum of 7 here because there are only 6 squares in the home row. The remaining number of stones must be in the middle row.
+We sum over the number of stones at the start for both players, from 0 to 7, over the number of stones at the finish, again for both players from 0 up to 7 - their respective start numbers. Then for both players over the number of stones in the home row from 0 to 6 - (stones at start or finish) (to a maximum of 6 here because there are only 6 squares in the home row. The remaining number of stones must be in the middle row.
 For the home row and middle row there are multiple configurations, in each home row we have 6 squares over which to divide ![equation](https://latex.codecogs.com/gif.latex?h_i) stones and in the middle row we have 8 squares over which to divide ![equation](https://latex.codecogs.com/gif.latex?\small&space;m_r&space;&plus;&space;m_b) stones. 
 This results in the number of afterstates:
 
@@ -176,18 +180,22 @@ Unlike more complicated games like backgammon, or even worse chess or go, here t
 So it _is_ possible to not use a neural network but explicitly tabulate all possible afterstates and estimate a value for each one separately.
 Nevertheless, this is still not the best way to go, because there will be no generalization from states to other similar states whatsoever.
 The agent will have to visit each of these states many times during training to obtain a good approximation of the value function.
-
+In contrast with a neural network, states that are very similar will have similar values, and the network will learn which differences are important and which are not.
 
 <a name="plcy"/>
 
 ## Policy
 
-The value function as presented above is not yet completely well defined, because the win probability in a given (after)state depends on the moves chosen subsequently. More formally, it depends on the _policy_ used, where a policy is a map from a state to an action, i.e. a way of choosing a move.
+The value function as presented above is actually not yet completely well defined, because the win probability in a given (after)state depends on the moves chosen subsequently. 
+More formally, it depends on the _policy_ used, where a policy is a map from a state to an action, i.e. a way of choosing a move.
 
 What we are after is the optimal policy, choosing the action that maximizes the win probability against an opponent also playing optimally.
 Given the true value function assuming optimal play, we can easily obtain the optimal policy, simply by choosing the action that maximizes the afterstate value.
 
-Of course we don't have this either, but we can work our way towards it. We start with some random value function as defined in the previous section. From this we derive a policy as above, this is called the _greedy policy_, because it maximizes the value in the next state, and does not take into consideration that to obtain the longer term maximum we might have to accept short term losses.
+Of course we don't have this either, but we can work our way towards it. 
+We start with some random value function as defined in the previous section. 
+From this we derive a policy as above, this is called the _greedy policy_, because it maximizes the value in the next state, 
+and does not take into consideration that to obtain the longer term maximum we might have to accept short term losses.
 Then we update our estimate of the value function to more accurately reflect the win probability of this policy (see below how).
 Then we use this updated value function to define a new policy in the same way.
 Iterating this is called _policy iteration_, and will allow us to converge to the optimal policy and value function.
@@ -199,6 +207,10 @@ Iterating this is called _policy iteration_, and will allow us to converge to th
 Now how do we update our estimate of the value function?
 We do this using _Temporal Difference (TD) Learning_, whose basic premise is that future states have more information than present states.
 The logic is that a. they are closer to the final win/loss state, and b. they have experienced more environment dynamics.
+In the extreme case, the game has finished and we know the outcome.
+
+---TODO: work in bootstrapping
+
 So what we can do is compute the value of the current state, ![equation](https://latex.codecogs.com/gif.latex?v(S_t)), and then take a step (using the policy whose value we're estimating), and compute the value ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})) there.
 Assuming that the latter is more accurate, we want to update our estimate to move ![equation](https://latex.codecogs.com/gif.latex?v(S_t)) closer to ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})). In other words we want to minimize ![equation](https://latex.codecogs.com/gif.latex?(v(S_t&plus;1)&space;-&space;v(S_t))^2), but only through ![equation](https://latex.codecogs.com/gif.latex?v(S_t)). Now v is a neural network, parametrized by weights w, so we can do this using gradient descent, resulting in the weight update
 
@@ -218,15 +230,19 @@ This uses an _eligibility trace_, which is an exponentially decaying average of 
 
 ![equation](https://latex.codecogs.com/gif.latex?z_{t&plus;1}&space;=&space;\lambda&space;z_t&space;&plus;&space;\nabla_w&space;v)
 <!-- z_{t+1} = \lambda z_t + \nabla_w v -->
-where lambda in (0,1) specifies the decay rate, and thus the time scale over which previous moves are considered to have an impact on the current value.
-When lambda=0 we recover the previous 1-step TD, but often, and indeed in our case too, lambda=0.9 is found to be more efficient.
+where ![equation](https://latex.codecogs.com/gif.latex?\small&space;\lambda&space;\in&space;[0,&space;1]) pecifies the decay rate, and thus the time scale over which previous moves are considered to have an impact on the current value.
+
+When lambda is 0 we recover the previous 1-step TD, where only the last actions is held responsible for the result.
+At the other extreme when lambda is 1, all previous actions are held equally responsible, this is called Monte Carlo learning.
+Moves clearly can have a longer term effect, but at the same time the random element in the game will wash out their influence over time. 
+So the optimal value is somewhere in between.
 
 <a name="srch"/>
 
 ## Search
 
 Again following TD-Gammon, we use a 2-ply search. 
-A ply is a single player's move, so a one ply search would be to look at all available moves, evaluate their after states, and choose the move with the highest value after state (or lowest for the blue player).
+A ply is a single player's move, so a one ply search would be to look at all available moves, evaluate their afterstates, and choose the move with the highest value afterstate (or lowest for the blue player).
 A two ply search, as it is done in TD-Gammon and as we do here, works as follows. The afterstates found after 1-ply are not full states, they need to be supplemented with a new roll of the dice. We complete them in all possible ways, that is, with die rolls from 0 to 4.
 This then forms another full state, typically with the opponent to move (unless landing on a rosette). 
 For each of these states, we do another 1-ply search to find the move that is best for whoever's turn it is, and compute the value of the resulting afterstate.
@@ -242,8 +258,8 @@ We do this both during training and during play after training.
 ## Self-Play
 
 So far we have described the methods by which the agent can improve through playing the game. But who does it play against?
-We want it to be able to play a lot of games quickly, so its opponent should also be an AI, and we want its opponent to also grow in strength, 
-it won't learn much by playing against random moves for example.
+We want it to be able to play a lot of games quickly, so its opponent should also be an AI.
+We also want its opponent to also grow in strength, as it won't learn much by playing against random moves for example.
 
 The obvious answer is that it plays itself.
 This brings the risk that it will learn a strategy that works well against the same strategy but fails against another strategy it does not know.
@@ -251,8 +267,10 @@ One could train it against an ensemble of previous versions or instantiations of
 Here however, due to the simplicity of Ur and the random component that brings a degree of exploration, this is unlikely to be an issue.
 
 It can be a bit confusing to have the agent play both sides, and update its weights on all moves done during training.
-To make this clearer, we have set it up so that no matter whose turn it is, we always want to improve our estimate of the value function as seen from the point of view of the red player. The eligibility vector tracks the influence of older decisions on this value function.
-So neither of these, the value function or the eligibility vector, or how the updates are done, depend on whose turn it is.
+To make this clearer, we have set it up so that no matter whose turn it is, 
+we always want to improve our estimate of the value function as seen from the point of view of the red player. 
+The eligibility trace tracks the influence of older decisions on this value function.
+So neither of these, the value function or the eligibility trace, or how the updates are done, depend on whose turn it is.
 The only place where this enters is that if it is the red player's turn, they will choose the move that maximizes the value function, 
 while if it is the blue player's turn they will choose the move that minimizes the value function.
 
@@ -263,21 +281,19 @@ Finally we discuss a few implementation details.
 
 ### Board Representation
 
-For the board itself, internally a different representation is used, where the board is unrolled so that movement is always from left to right, 
-and the middle row is duplicated, with stones always staying on their own side. 
-This has several advantages. 
-First of all the game logic becomes much simpler, not needing to navigate the corners of the board. 
-But a second advantage is that with stones always staying on their own side, we can use simply zeros and ones for absence or presence of a stone at a particular position.
-This almost makes it a binary representation, save for the start and finish values ranging between 0 and 7. 
-This is clean and easy for the neural network to interpret than including negative ones for the opponent.
-It might also be interesting to look at a fully binary representation, encoding the start and end values not in binary but "unary", 
-so that also the norm of the feature vector is constant.
-This allows us to use a heuristic to set the learning rate, inspired by linear approximations. 
-- TODO explain further/remove? above
-- TODO mention 32-dimensional input vector
+For the board itself, internally a different representation is used, where the board is unrolled so that movement is always from left to right.
+The middle row is duplicated, with stones always staying on their own side but of course still capturing opponent stones on the other side of the region that maps to the middle row.
 
-We furthermore flip the board if necessary so that the neural network always gets fed boards where it's the red player's turn.
-To always output the value function as seen from the red player's point of view, which seems the most stable, we output 1 - value if it was actually the blue player's turn.
+This simplifies the internal game logic and results in a 2 by 16 array.
+The values in the array are simply zeros for absence of a stone and ones for presence, 
+with the color of the stone determined by the row it is on.
+The only exception are the first and last column indicating the number of stones at the start or finish, which range from 0 to 7.
+
+Before we input this board to the value network, we flip it if necessary so that the network always gets fed boards where it is  the red player's turn.
+Then we flatten the board into a 32-dimensional vector.
+To always output the value function as seen from the red player's point of view, which seems conceptually the simplest,
+we directly output the value if it actually was the red player's turn, and otherwise we output 1 - the computed value.
+This also enforces a symmetry present in the game, where if we mirror the board along the middle row and change turn, we obtain the same state, only with the roles of red and blue reversed.
 
 ### Jax
 
