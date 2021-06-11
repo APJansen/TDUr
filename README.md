@@ -321,6 +321,8 @@ There are a number of hyperparameters in this setup:
 - search depth: 2 (1, 2)
 - training episodes: 8000 (500-20.000)
 
+The hyperparameters used in TD-Gammon were a learning rate of 0.1 and a lambda of 0.7 (see [here](https://papers.nips.cc/paper/1991/file/68ce199ec2c5517597ce0a4d89620f55-Paper.pdf)).
+
 These need to be chosen manually, and this choice can dramatically affect the performance.
 To find good hyperparameters, one needs to train an agent with them and then evaluate the trained agent against other agents trained with different hyperparameters. 
 This quickly gets very time consuming. Due to the element of luck in Ur, one needs to compete two agents for a lot of games to be sure one is really better.
