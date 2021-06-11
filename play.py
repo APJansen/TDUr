@@ -380,7 +380,7 @@ class Board:
         # for squares on the board, update color
         else:
             red, blue = self.style['red'], self.style['blue']
-            if self.game.in_middle(w):
+            if h_display == 1:
                 if game.board[0, w]:
                     color = red
                 elif game.board[1, w]:
@@ -390,10 +390,8 @@ class Board:
             else:
                 if board_val == 0:
                     color = 'white'
-                elif h_display == 1:
-                    color = [red, blue][game.turn]
                 else:
-                    color = [red, blue][h]
+                    color = [red, blue][h_display // 2]
 
             button.style = {'button_color': color}
 
