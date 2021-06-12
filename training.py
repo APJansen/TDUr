@@ -40,17 +40,27 @@ def train(agent, game, episodes, learning_rate, epsilon, lmbda, discount=1, sear
 
         new_value = agent.value(game.board, game.turn)
 
-        while not game.has_finished():
+        # play until the game is finished, and then do one more update on the value of the final state
+        finished = False
+        while not finished:
+            finished = game.has_finished()
+
             value = new_value
             grad_value = agent.value_gradient(game.board, game.turn)
 
-            move = agent.policy(game, epsilon=epsilon, plies=search_plies)
-            game.play_move(move)
+            if not finished:
+                move = agent.policy(game, epsilon=epsilon, plies=search_plies)
+                game.play_move(move)
 
-            reward = game.reward()
-            new_value = agent.value(game.board, game.turn)
+                new_value = agent.value(game.board, game.turn)
 
-            TD_error = get_TD_error(new_value, value, reward, game.has_finished(), discount)
+                TD_error = discount * new_value - value
+            else:
+
+                # once the game is finished it gives a reward, 1 if player 0 won, else 0
+                # still need to update the value of the final state
+                reward = game.reward()
+                TD_error = reward - value
 
             eligibility = update_eligibility(eligibility, discount * lmbda, grad_value)
             agent.update_params(learning_rate * TD_error, eligibility)
