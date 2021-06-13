@@ -153,13 +153,12 @@ class TDUr:
     def _init_network_params(self):
         """Initialize the parameters of the neural network.
 
-        Uses He initialization for the first layer which has relu activation, and Xavier for the second,
-        which has sigmoid activation.
+        Uses sigmoid activation for both layers.
         """
         keys = random.split(self.key, 2)
         n_in, n_hidden, n_out = self.input_units, self.hidden_units, 1
-        layer_1 = self._random_layer_params(n_in=n_in, n_out=n_hidden, key=keys[0], activation='relu')
-        layer_2 = self._random_layer_params(n_in=n_hidden, n_out=n_out, key=keys[1], activation='sigmoid')
+        layer_1 = self._random_layer_params(n_in=n_in, n_out=n_hidden, key=keys[0])
+        layer_2 = self._random_layer_params(n_in=n_hidden, n_out=n_out, key=keys[1])
         return [layer_1, layer_2]
 
     @staticmethod
@@ -217,26 +216,20 @@ class TDUr:
         return [(w + scalar * z_w, b + scalar * z_b) for (w, b), (z_w, z_b) in zip(params, eligibility)]
 
     @staticmethod
-    def _random_layer_params(n_in, n_out, key, activation):
+    def _random_layer_params(n_in, n_out, key, scale=1e-4):
         """Initialize parameters for a single layer.
 
         Args:
             n_in: Number of input units.
             n_out: Number of output units.
             key: A jax random key.
-            activation: A string specifying the activation used, `'relu'` or `'sigmoid'`.
+            scale: Optional, defaults to 1e-4, sets scale of gaussian.
 
         Returns:
             Tuple (weights, biases)
         """
         w_key, b_key = random.split(key)
-        if activation == 'sigmoid':
-            scale = jnp.sqrt(1 / n_in)
-            weights = scale * random.normal(w_key, (n_out, n_in))
-            biases = jnp.zeros(shape=(n_out,))
-        else:  # activation == 'relu'
-            scale = jnp.sqrt(2 / n_in)
-            weights = scale * random.normal(w_key, (n_out, n_in))
-            biases = jnp.zeros(shape=(n_out,)) + 0.1
+        weights = scale * random.normal(w_key, (n_out, n_in))
+        biases = jnp.zeros(shape=(n_out,))
 
         return weights, biases
