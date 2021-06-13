@@ -101,7 +101,7 @@ There are 4 available moves
 - b2 moves that stone closer to the finish and reduces its chance of being captured
 - g3 moves that stone to the finish
 - e3 puts another stone on the board
-- 
+
 Considerations are similar here to the other board, b3 could turn out very well if the next throw is good, but we could also throw a 0, or even a 2 would be bad.
 Moving g3 to the finish might not seem most urgent, but only a rather rare throw of 1 can do this, so if we postpone it for too long we might end up with our last stone stuck there.
 
@@ -255,6 +255,9 @@ The move we choose then is the one that maximizes this value.
 
 We do this both during training and during play after training. 
 
+Note that there is one slight complication in Ur with respect to Backgammon, namely that the turn might not change, if we land on a rosette.
+This doesn't change the algorithm though, if we search for 2 ply regardless of whose move it is, and of course take care to choose the move appropriately depending on whose turn it is at either ply.
+
 <a name="selfplay"/>
 
 ## Self-Play
@@ -275,6 +278,7 @@ The eligibility trace tracks the influence of older decisions on this value func
 So neither of these, the value function or the eligibility trace, or how the updates are done, depend on whose turn it is.
 The only place where this enters is that if it is the red player's turn, they will choose the move that maximizes the value function, 
 while if it is the blue player's turn they will choose the move that minimizes the value function.
+On every move regardless of who made it we update the eligibility trace and the value function.
 
 <a name="details"/>
 
@@ -312,14 +316,19 @@ without having to explicitly add the batch dimension in the code.
 
 Finally, for the final TD error, when a game is finished, we use the reward minus the previous value, rather than the reward plus the next value minus the previous value. This is because we know the total return of the final state exactly, it is simply one if we have won and zero otherwise, so there is no need to bootstrap.
 
+### Initialization
+
+It is very important not to initialize the value network's parameters too large.
+In particular using Xavier initialization, appropriate for supervised learning with sigmoid activation, leads to large random initial biases that training through self-play cannot overcome.
+We initialize biases at zero and weights normally distributed, with standard deviation 1e-4.
+
 ### Hyperparameters
 There are a number of hyperparameters in this setup:
 - hidden units: 40 (20, 40, 80)
-- learning rate: 0.01 (0.1, 0.01, 0.001)
-- lambda: 0.9 (0.8, 0.9, 0.99)
-- epsilon: 0 (0, 0.0001)
+- learning rate: 0.01 (0.01, 0.003, 0.0003)
+- lambda: 0.9 (0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
+- epsilon: 0 
 - search depth: 2 (1, 2)
-- training episodes: 8000 (500-20.000)
 
 The hyperparameters used in TD-Gammon were a learning rate of 0.1 and a lambda of 0.7 (see [here](https://papers.nips.cc/paper/1991/file/68ce199ec2c5517597ce0a4d89620f55-Paper.pdf)).
 
@@ -336,4 +345,7 @@ The value of 0 for epsilon also seems reasonable since the randomness of the die
 Finally the values of the learning rate and the TD parameter lambda are commonly chosen values as well.
 
 TODO: add experiment on search depth
+TODO: describe new grid search
+TODO: comment on effect of lambda
+TODO: maybe some learning curves?
 
