@@ -114,7 +114,9 @@ TD-Ur chose to move b3 to the rosette and have another turn.
 Ur's successor Backgammon was the first game in which human experts were surpassed by a self learning AI, called [TD-Gammon](https://www.csd.uwo.ca/~xling/cs346a/extra/tdgammon.pdf) by Tesauro.
 Since Ur is thought to be a simpler predecessor of Backgammon, it seems appropriate and sufficient to use the techniques of TD-Gammon for Ur, resulting in the TD-Ur presented here.
 
---TODO: add comment about performance
+Unfortunately I don't have a good way to judge TD-Ur's performance as it is not a widely played game, but I would love to hear your performance against it!
+For lack of a better measure, I lost 8-2 against it. Though that is clearly a way too small sample size to be meaningful, and 4 of the games were
+toss-ups with both waiting for the last right die roll, 3 of which went to TD-Ur.
 
 The essential techniques are using a neural network to parametrize a value function, which is learned using TD(lambda) and a 2-ply lookahead search.
 
