@@ -1,4 +1,4 @@
-from TDUr import TDUr
+from agent import TDUr
 from game import Ur
 import ipywidgets as ipyw
 from functools import partial
