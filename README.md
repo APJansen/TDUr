@@ -67,7 +67,10 @@ Finally, when a player has no legal moves, or a 0 is thrown, they must pass. Pas
 <a name="play"/>
 
 ## Play Game!
-The easiest way to play the game against TD-Ur is to go to this link. __TODO: add link once it's public, changing the imports from drive to online__
+The easiest way to play the game against TD-Ur is to go to click this: 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/APJansen/TDUr/blob/play_Ur.ipynb)
+
+Then in the pop up menu open play_Ur.ipynb and evaluate the cells by selecting them and pressing shift-enter.
 This will run the code remotely (in a Colab notebook), which means you don't need to install anything, but also that there is a slight delay after making a move.
 
 If you are familiar with Python you can download this repository and run the Jupyter notebook play_game.ipynb.
