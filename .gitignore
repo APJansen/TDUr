@@ -1,3 +1,4 @@
 # Project exclude paths
 /venv/
 /explore.ipynb
+/parameters/
