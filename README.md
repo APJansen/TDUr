@@ -105,7 +105,7 @@ There are 4 available moves:
 Considerations are similar here to the other board, b3 could turn out very well if the next throw is good, but we could also throw a 0, or even a 2 would be bad.
 Moving g3 to the finish might not seem most urgent, but only a rather rare throw of 1 can do this, so if we postpone it for too long we might end up with our last stone stuck there.
 
-TD-Ur chose to move g3 to the finish.
+TD-Ur chose to move b3 to the rosette and have another turn.
 
 <a name="tdur"/>
 
@@ -272,8 +272,6 @@ We sum these up, weighted with the probability of the corresponding die roll (th
 This gives the expected 2-ply afterstate value.
 The move we choose then is the one that maximizes this value.
 
-We can do this both during training and during play after training. 
-
 Note that there is one slight complication in Ur with respect to Backgammon, namely that the turn might not change, if we land on a rosette.
 This doesn't change the algorithm though, if we search for 2 ply regardless of whose move it is, and of course take care to choose the move appropriately depending on whose turn it is at either ply.
 
@@ -342,29 +340,63 @@ In particular using Xavier initialization, appropriate for supervised learning w
 We initialize biases at zero and weights normally distributed, with standard deviation 1e-4.
 
 ### Hyperparameters
-There are a number of hyperparameters in this setup:
-- hidden units: 40 (20, 40, 80)
-- learning rate: 0.01 (0.01, 0.003, 0.0003)
+There are a number of hyperparameters in this setup, listed below with the values we tried in brackets:
+- hidden units N: 40 (20, 40, 80)
+- learning rate alpha: 0.01 (0.01, 0.003, 0.0003)
 - lambda: 0.9 (0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
 - epsilon: 0 
 - search depth: 2 (1, 2)
 
-The hyperparameters used in TD-Gammon were a learning rate of 0.1 and a lambda of 0.7 (see [here](https://papers.nips.cc/paper/1991/file/68ce199ec2c5517597ce0a4d89620f55-Paper.pdf)).
+I chose these by guessing what is reasonable, and then possibly experimenting with those and some lower and higher values.
 
-These need to be chosen manually, and this choice can dramatically affect the performance.
-To find good hyperparameters, one needs to train an agent with them and then evaluate the trained agent against other agents trained with different hyperparameters. 
-This quickly gets very time consuming. Due to the element of luck in Ur, one needs to compete two agents for a lot of games to be sure one is really better.
-The values in brackets above are the ones I have tried, in most combinations. 
-The value before that denotes the best values I have found, though I haven't done anything like an exhaustive search.
+TD-Gammon used 40 or 80 units in different versions. Since Ur is much simpler than Backgammon, 40 seems reasonable, and we'll experiment with 20 and 80 too.
 
-TD-Gamma used 80 hidden units, so since Ur is much simpler 40 seems reasonable.
-It also uses a 2-ply search. Here it seems likely that searching for a bigger depth can yield more improvements, though with diminishing returns because of an increasing contribution of luck, and at the cost of slower training and playing.
-The other hyperparameters, the learning rate, lambda and the exploration parameter epsilon, I haven't found TD-Gammon's values.
-The value of 0 for epsilon also seems reasonable since the randomness of the die rolls already gives rise to exploration of different states.
-Finally the values of the learning rate and the TD parameter lambda are commonly chosen values as well.
+For the learning rate there is a heuristic (see Sutton & Barto), where if it is set to ![equation](https://latex.codecogs.com/gif.latex?\small&space;\alpha&space;=&space;\frac{1}{N&space;\mathbb{E}\[&space;\|x\|^2&space;\]}) where x is the feature vector, then it will take about
+N visits to a similar state to fully replace the previous value.
+Taking N=10 and estimating the average feature vector by using a previously trained agent, we obtain our middle guess of alpha = 0.003.
+Given the die roll probabilities in Ur, N=10 seems low in that it will be swayed by having several lucky or unlucky throws in a row from a similar state.
+However TD-Gammon used alpha = 0.1 (see [here](https://papers.nips.cc/paper/1991/file/68ce199ec2c5517597ce0a4d89620f55-Paper.pdf)), so this is a bit of a compromise, and we try 0.01, 0.003 and 0.0003.
 
-TODO: add experiment on search depth
-TODO: describe new grid search
-TODO: comment on effect of lambda
-TODO: maybe some learning curves?
+For lambda, TD-Gammon used 0.7. The random element seems more important in Ur, which I think brings the optimal lambda down.
+Nevertheless we experiment with a broad range of values from 0.5 to 0.95.
 
+Epsilon is the parameter that controls the amount of exploration.
+The random element of the die rolls itself already gives rise to exploration of different states, so we set this to 0.
+
+We then train agents for all of the parameter combinations.
+After determining a good agent through some competitions, we can create what are called learning curves.
+These show how an agent improves with more training.
+For these curves, we compete the agent trained with a particular combination of hyperparameters for 1000 matches against a fixed relatively good other agent, and record the win percentage, which is what is plotted.
+Every 500 episodes of training the parameters are saved, and competed at this fixed agent.
+The plot below is for lambda = 0.9 and the values of N and alpha indicated.
+
+![plot](./images/learning_curve.png)
+
+There is a large amount of variance, mostly because of the evaluation metric, 1000 matches is still not enough to get an accurate estimate,
+but also because of the performance itself, it is not guaranteed to improve with more training.
+Most improvement happens in roughly the first 5000 episodes for the two larger learning rates, while the smallest is nowhere near converged yet.
+Even the larger two learning rates may still be improving.
+
+Another way to get some insight is with a parameter study. 
+Here we take as final performance of a given agent the previously calculated win rate averaged over the agent's last 5000 training episodes.
+
+![plot](./images/parameter_study.png)
+
+These plots show that more hidden units is generally better, in the chosen range.
+And for the number of episodes trained, a larger alpha is generally better.
+Or in other words, more training may be beneficial.
+In regards to lambda, the two lower learning rates favor higher lambda, but this may be an artifact of the limited number of training episodes,
+as with a larger lambda, parameters are updated more often.
+The curves for alpha = 0.01 suggest an intermediate value of lambda is best, though the dip at lambda=0.7 might indicate that even here there is still
+a lot of variance.
+
+Based on these results, we take N = 80 and lambda = 0.8 as the most promising candidates, and train agents with learning rates 0.01 and 0.003
+for a total of a 500.000 episodes each. The one with learning rate 0.01 turned out slightly better, so we take that as our final best agent.
+It won 62.8% of its games against our reference agent (over 10.000 games).
+This agent playing with a 2-ply search is what we refer to as TD-Ur.
+
+Finally, note that all the training has been done with only a 1-ply search. 
+In principle using a 2-ply search will change the training dynamics and probably improve the performance of the resulting weights when using a 2-ply 
+search during actual play. However it also slows down training by a factor of about 8.
+Therefore we limit to training with 1-ply search, and only use 2-ply search during actual play with a trained agent.
+Our best agent wins 53.5 percent of the time using 2-ply search versus itself using only a 1-ply search (over 10.000 games).
