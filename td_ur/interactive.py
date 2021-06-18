@@ -1,5 +1,5 @@
-from agent import TDUr
-from game import Ur
+from td_ur.agent import TDUr
+from td_ur.game import Ur
 import ipywidgets as ipyw
 from functools import partial
 import time
