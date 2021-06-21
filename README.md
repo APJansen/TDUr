@@ -67,11 +67,12 @@ Finally, when a player has no legal moves, or a 0 is thrown, they must pass. Pas
 <a name="play"/>
 
 ## Play Game!
-The easiest way to play the game against TD-Ur is to go to click this: 
+The easiest way to play the game against TD-Ur is to go to click the blue button below.
+Then in the pop up menu open play_Ur.ipynb and evaluate the cells by selecting them and pressing shift-enter.
+This will run the code remotely (in a Google Colab notebook), which means you don't need to install anything, but also that there is a slight delay after making a move.
+ 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/APJansen/TDUr/blob/play_Ur.ipynb)
 
-Then in the pop up menu open play_Ur.ipynb and evaluate the cells by selecting them and pressing shift-enter.
-This will run the code remotely (in a Colab notebook), which means you don't need to install anything, but also that there is a slight delay after making a move.
 
 If you are familiar with Python you can download this repository and run the Jupyter notebook play_game.ipynb.
 The dependencies are jax, numpy, matplotlib and ipywidgets.
@@ -83,7 +84,7 @@ The dependencies are jax, numpy, matplotlib and ipywidgets.
 
 To illustrate the types of strategic decisions the game presents, here are two game positions.
 
-![plot](./images/StrategyExamples.png)
+![plot](./images/strategy_examples.png)
 
 On the left board it's red's turn to move, with a throw of 2 (as indicated in the rightmost yellow squares).
 Red can move 3 stones, labelled by the coordinate of the stone that is moved these are: 
@@ -98,17 +99,26 @@ Finally moving d2 also gives up the middle rosette, which is a strong outpost th
 
 TD-Ur chose to capture with d2 here.
 
-On the right board, it is again the red player's turn to move with a throw of 1.
-There are 4 available moves:
-- b3 moves to a rosette and gives another turn
-- b2 moves that stone closer to the finish and reduces its chance of being captured
-- g3 moves that stone to the finish
-- e3 puts another stone on the board
+The right board is an illustrative example from the first game that I played against the final version of TD-Ur, where I was red and TD-Ur was blue.
+It is blue's turn with a throw of 2. The possible moves are:
+- e1 moving a new stone on the board
+- a1 capturing a red stone
+- h1 moving a stone to the finish
+- d2 moving off the rosette
 
-Considerations are similar here to the other board, b3 could turn out very well if the next throw is good, but we could also throw a 0, or even a 2 would be bad.
-Moving g3 to the finish might not seem most urgent, but only a rather rare throw of 1 can do this, so if we postpone it for too long we might end up with our last stone stuck there.
+The last one is not worth considering, but the others are. 
+Moving a stone to the finish is perhaps not the most urgent here.
+Capturing the red stone seems like a good idea though. If we don't it has a good chance of jumping over the rosette and either escaping to the finish or forcing
+us out of that square to capture it.
 
-TD-Ur chose to move b3 to the rosette and have another turn.
+TD-Ur placed a new stone on the board here though, and something very interesting happened.
+Notice the configuration of the red stones. On a die roll of 2, which is the most likely roll, all stones are either blocked by another stone, 
+blocked by the rosette occupied by the blue player or moving too far off the board.
+What happened in the game was that I threw a 2 three times in a row, not able to move, while TD-Ur filled up its starting row with the move above and further
+rolls of 1 and 3. 
+If TD-Ur had captured on the first move, I'd have recaptured immediately and been in a much better position.
+
+
 
 <a name="tdur"/>
 
@@ -183,10 +193,10 @@ The remaining number of stones must be in the middle row.
 For the home row and middle row there are multiple configurations, in each home row we have 6 squares over which to divide ![equation](https://latex.codecogs.com/gif.latex?h_i) stones and in the middle row we have 8 squares over which to divide ![equation](https://latex.codecogs.com/gif.latex?\small&space;m_r&space;&plus;&space;m_b) stones. 
 This results in the number of afterstates:
 
-![equation](https://latex.codecogs.com/gif.latex?\small&space;\sum_{s_r=0}^7\sum_{f_r=0}^{7-s_r}&space;\sum_{h_r=0}^{6&space;-&space;s_r&space;-&space;f_r}&space;\sum_{s_b=0}^7\sum_{f_b=0}^{7-s_b}&space;\sum_{h_b=0}^{6&space;-&space;s_b&space;-&space;f_b}&space;\binom{6}{h_r}&space;\binom{6}{h_b}&space;\binom{8}{m_r&space;&plus;&space;m_b}&space;=&space;21.342.488)
+![equation](https://latex.codecogs.com/gif.latex?\small&space;\sum_{s_r=0}^7\sum_{f_r=0}^{7-s_r}&space;\sum_{h_r=0}^{6&space;-&space;s_r&space;-&space;f_r}&space;\sum_{s_b=0}^7\sum_{f_b=0}^{7-s_b}&space;\sum_{h_b=0}^{6&space;-&space;s_b&space;-&space;f_b}&space;\binom{6}{h_r}&space;\binom{6}{h_b}&space;\binom{8}{m_r&space;&plus;&space;m_b}&space;=&space;21,342,488)
 <!-- \text{\# states}  = \sum_{s_r=0}^7\sum_{f_r=0}^{7-s_r} \sum_{h_r=0}^{6 - s_r - f_r} 
 \sum_{s_b=0}^7\sum_{f_b=0}^{7-s_b} \sum_{h_b=0}^{6 - s_b - f_b} \binom{6}{h_r} \binom{6}{h_b} \binom{8}{m_r + m_b} = 
-21.342.488 -->
+21,342,488 -->
 
 Unlike more complicated games like backgammon, or even worse chess or go, here this does still fit in memory.
 So it _is_ possible to not use a neural network but explicitly tabulate all possible afterstates and estimate a value for each one separately.
@@ -396,12 +406,12 @@ The curves for alpha = 0.01 suggest an intermediate value of lambda is best, tho
 a lot of variance.
 
 Based on these results, we take N = 80 and lambda = 0.8 as the most promising candidates, and train agents with learning rates 0.01 and 0.003
-for a total of a 500.000 episodes each. The one with learning rate 0.01 turned out slightly better, so we take that as our final best agent.
-It won 62.8% of its games against our reference agent (over 10.000 games).
+for a total of a 500,000 episodes each. The one with learning rate 0.01 turned out slightly better, so we take that as our final best agent.
+It won 62.8% of its games against our reference agent (over 10,000 games).
 This agent playing with a 2-ply search is what we refer to as TD-Ur.
 
 Finally, note that all the training has been done with only a 1-ply search. 
 In principle using a 2-ply search will change the training dynamics and probably improve the performance of the resulting weights when using a 2-ply 
 search during actual play. However it also slows down training by a factor of about 8.
 Therefore we limit to training with 1-ply search, and only use 2-ply search during actual play with a trained agent.
-Our best agent wins 53.5 percent of the time using 2-ply search versus itself using only a 1-ply search (over 10.000 games).
+Our best agent wins 53.5 percent of the time using 2-ply search versus itself using only a 1-ply search (over 10,000 games).
