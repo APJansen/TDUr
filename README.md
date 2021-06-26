@@ -42,7 +42,7 @@ explains the rules and history of the game, and plays a game against popular you
 The game is played by two players, on the board shown above, to the right an ancient Sumerian board and to the left my Mondriaan interpretation.
 The yellow squares are not part of the board, but indicate the start (left) and finish (right) squares.
 Each player starts with 7 stones, as indicated on the start square.
-The crosses correspond to the "rosettes" on the original board, and have a special function as explained below.
+The crosses correspond to the "rosettes" on the original board, and have a special function explained below.
 
 The goal of the game is to be the first player to bring all 7 stones from the start to the finish. Stones move along the route indicated in the image below.
 The middle row is where the routes overlap and players can capture eachother's stones.
@@ -74,7 +74,7 @@ This will run the code remotely (in a Google Colab notebook), which means you do
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/APJansen/TDUr/blob/play_Ur.ipynb)
 
 
-If you are familiar with Python you can download this repository and run the Jupyter notebook play_game.ipynb.
+If you are familiar with Python you can download this repository and run the Jupyter notebook play_Ur_local.ipynb.
 The dependencies are jax, numpy, matplotlib and ipywidgets.
 
 
@@ -108,8 +108,9 @@ It is blue's turn with a throw of 2. The possible moves are:
 
 The last one is not worth considering, but the others are. 
 Moving a stone to the finish is perhaps not the most urgent here.
-Capturing the red stone seems like a good idea though. If we don't it has a good chance of jumping over the rosette and either escaping to the finish or forcing
-us out of that square to capture it.
+Capturing the red stone seems like a good idea though. 
+If we don't it has a good chance of jumping over the rosette and either escaping to the finish or forcing
+us out of the middle rosette to capture it.
 
 TD-Ur placed a new stone on the board here though, and something very interesting happened.
 Notice the configuration of the red stones. On a die roll of 2, which is the most likely roll, all stones are either blocked by another stone, 
@@ -124,11 +125,11 @@ If TD-Ur had captured on the first move, I'd have recaptured immediately and bee
 
 # TD-Ur
 
-Ur's successor Backgammon was the first game in which human experts were surpassed by a self learning AI, called [TD-Gammon](https://www.csd.uwo.ca/~xling/cs346a/extra/tdgammon.pdf) by Tesauro.
+Ur's successor Backgammon was the first game in which human experts were surpassed by a self learning AI, called [TD-Gammon](https://www.csd.uwo.ca/~xling/cs346a/extra/tdgammon.pdf) by Gerald Tesauro.
 Since Ur is thought to be a simpler predecessor of Backgammon, it seems appropriate and sufficient to use the techniques of TD-Gammon for Ur, resulting in the TD-Ur presented here.
 
 Unfortunately I don't have a good way to judge TD-Ur's performance as it is not a widely played game, but I would love to hear your performance against it!
-For lack of a better measure, I lost 8-2 against it. Though that is clearly a way too small sample size to be meaningful, and 4 of the games were
+For lack of a better measure, I lost 8-2 against it. But this is clearly a way too small sample size to be meaningful, and 4 of the games were
 toss-ups with both waiting for the last right die roll, 3 of which went to TD-Ur.
 
 The essential techniques are using a neural network to parametrize a value function, which is learned using TD(lambda) and a 2-ply lookahead search.
@@ -142,18 +143,20 @@ If it does mean something to you, at the end I comment on some implementation de
 ## Reinforcement Learning
 
 Reinforcement learning is a branch of machine learning that applies to situations in which an _agent_ interacts with and receives _rewards_ from an _environment_.
-In the present case, the environment is the game board and its rules, the rewards only come at the end and is simply the outcome of the game, and the agent is the AI that we want to train.
+In the present case, the environment is the game board and its rules, the only reward comes at the end and is simply the outcome of the game, and the agent is the AI that we want to train.
 
 This setting is formalized into a mathematical structure called a _Markov Decision Process (MDP)_. An MDP consists of _states_, _actions_, _rewards_ and _transition probabilities_. 
 In the present case, a state consists of the board configuration, the last die roll, and whose turn it is. 
-This fully characterizes the current state of the game and it is a Markov state because what happens next depends only on this state, not how we arrived there.
+This fully characterizes the current state of the game.
+It is called a _Markov state_ because what happens next does not depend on how we arrived at this state, only on the state itself.
 
 In each state, there are one or more available actions to choose from, here these are the legal moves.
 Upon choosing a specific action in a given state, the game moves to a new state, according to the transition probabilities for this state, action pair.
 Here this is a three step process:
-1. deterministic consequences of the move, i.e. when the roll is 2 and the chosen stone to move is at position 4, the stone is removed from position 4 and put back at position 6, the opponent's stone is removed and put back at the start, and the turn is transferred to the opponent. The intermediate "state" after the deterministic part of the transition but before the full transition is called an _after state_.
+1. deterministic consequences of the move, i.e. when the roll is 2 and the chosen stone to move is at position 4, the stone is removed from position 4 and put back at position 6, the opponent's stone is removed and put back at the start, and the turn is transferred to the opponent.
 2. The opponent rolls the dice.
 3. From the point of view of the opponent, this is now a state again. But viewing it from the point of view of our agent, we don't know and can't influence what the opponent will do, so this is still part of the environment dynamics, up until the point that it's our turn and we've thrown the dice.
+
 Of course if we land on a rosette, it is our (i.e. the agent's) turn again, and there is no step 3.
 On each transition to a new state, the agent receives a reward. But in this game, there are no intermediate rewards, only a final win or loss. So the reward is 1 on the final transition to a win, and 0 otherwise.
 
@@ -166,15 +169,20 @@ The goal of a reinforcement learning agent is to maximize the sum of its rewards
 To maximize the win probability in the reinforcement learning paradigm, we let the agent learn how to do it for itself.
 This often involves having the agent learn a _value function_, an estimate of the expected return in the current state, or the win probability in our case.
 This value function can be allowed to depend only on the current state, or also on the chosen action, when it's called an action value.
-For games such as Ur where the transition to a new state can be decomposed into first a deterministic part and then a probabilistic part, it is convenient to choose a middle ground, namely the afterstate mentioned above. 
-So the input to our value function will be the board configuration and whose turn it is, but it does not include the next roll of the dice.
+
+For games such as Ur, where the transition to a new state can be decomposed into first a simple deterministic part, and then an unknown part involving probability and/or the opponent's move, it is convenient to choose a middle ground.
+This middle ground is called an _afterstate_, which is the intermediate "state" directly after the simple deterministic part of the transition.
+Here the afterstate consists of a board configuration directly after making a move and whose turn it is, but excluding the next roll of the dice.
 
 Given such an afterstate ![equation](https://latex.codecogs.com/gif.latex?\small&space;s_a) obtained from the deterministic part of the transition after taking action a in state s, we want to learn to estimate a number
 ![equation](https://latex.codecogs.com/svg.latex?0%20%5Cleq%20v%28s_a%29%20%5Cleq%201%7B%5Ccolor%7BDarkOrange%7D%20%7D) <!-- 0 <= v(s_a) <= 1 -->
 representing the probability of winning the game.
 
 ### Neural Network
-We will use a neural network to represent this function. A simple fully connected network with one hidden layer will do. Using a sigmoid activation function on the final layer guarantees that the value will be between 0 and 1.
+We will use a neural network to represent this function. 
+This is a convenient way to approximate a function by slowly changing a set of parameters, also called _weights_, that we will call w.
+
+A simple fully connected network with one hidden layer will do. Using a sigmoid activation function on the final layer guarantees that the value will be between 0 and 1.
 Initializing the weights as random small numbers, our initial estimate will have values near 0.5, with no structure or meaning to it.
 We will see below how to slowly update this to approximate the actual win probabilities.
 
@@ -198,12 +206,13 @@ This results in the number of afterstates:
 \sum_{s_b=0}^7\sum_{f_b=0}^{7-s_b} \sum_{h_b=0}^{6 - s_b - f_b} \binom{6}{h_r} \binom{6}{h_b} \binom{8}{m_r + m_b} = 
 21,342,488 -->
 
-Unlike more complicated games like backgammon, or even worse chess or go, here this does still fit in memory.
+Unlike more complicated games like Backgammon, or even worse chess or go, here this does still fit in memory.
 So it _is_ possible to not use a neural network but explicitly tabulate all possible afterstates and estimate a value for each one separately.
 
 Nevertheless, this is still not the best way to go, because there will be no generalization from states to other similar states whatsoever.
 The agent will have to visit each of these states many times during training to obtain a good approximation of the value function.
-In contrast with a neural network, states that are very similar will have similar values, and the network will learn which differences are important and which are not.
+In contrast, with a neural network states that are very similar will have similar values, and the network will learn which differences are important and which are not.
+In this way, instead of learning a value for each afterstate separately, we only have to learn the weights of the neural network, and using only on the order of a few thousand weights will suffice.
 
 <a name="plcy"/>
 
@@ -215,18 +224,19 @@ More formally, it depends on the _policy_ used, where a policy is a map from a s
 What we are after is the optimal policy, choosing the action that maximizes the win probability against an opponent also playing optimally.
 Given the true value function assuming optimal play, we can easily obtain the optimal policy, simply by choosing the action that maximizes the afterstate value.
 
-### Policy Iteration
+### Value Iteration
 
-Of course we don't have this either, but we can work our way towards it. A general framework for this is called _policy iteration_.
+Of course we don't have this either, but we can work our way towards it. A framework for this is called _value iteration_.
 This consists of alternating one step of:
 1. _policy evaluation_: keeping the policy fixed and improving the estimate of its corresponding value function
 2. _policy improvement_: using the estimate of its value function to improve the policy
 
 One way of doing policy evaluation is TD learning, described below.
 
-For policy improvement, we can define a new policy in terms of the estimated value function of the old one as choosing the action that results in the maximal value of the old policy.
-This is called the _greedy policy_, because it maximizes the value in the next state, 
-and does not take into consideration that to obtain the longer term maximum we might have to accept short term losses.
+For the policy improvement step, we can make use of the _greedy policy_. 
+This is a policy that, given a value function, simply makes the move that results in the highest value at the next state.
+It is called greedy because it does not take into consideration that to obtain maximal long term rewards, it might be necessary to accept short term losses.
+We apply this policy to our current estimate of the value function of the previous policy.
 In tabular cases, where we parametrize the value of every state individually, this is guaranteed to improve the policy.
 
 With a neural network approximation of the value function we lose this guarantee, because the resulting changes to the next estimate of the value function will generalize to different states. While there is no guarantee that this generalization is beneficial, in practice this still works very well.
@@ -238,7 +248,7 @@ With a neural network approximation of the value function we lose this guarantee
 Now how do we update our estimate of the value function?
 We do this using _Temporal Difference (TD) Learning_, whose basic premise is that future states have more information than present states.
 The logic is that a. they are closer to the final win/loss state, and b. they have experienced more environment dynamics.
-In the extreme case, the game has finished and we know the outcome.
+In the extreme case for example, the game has finished and we know the outcome.
 
 So what we can do is to compute the value of the current state ![equation](https://latex.codecogs.com/gif.latex?v(S_t)), and then play a move (using the policy whose value we're estimating), and compute the value ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})) there.
 We have assumed that the latter is more accurate, so we want to update our estimate to move ![equation](https://latex.codecogs.com/gif.latex?v(S_t)) closer to ![equation](https://latex.codecogs.com/gif.latex?v(S_{t+1})). In other words we want to minimize ![equation](https://latex.codecogs.com/gif.latex?(v(S_{t&plus;1})&space;-&space;v(S_t))^2), but only through ![equation](https://latex.codecogs.com/gif.latex?v(S_t)). Now v is a neural network, parametrized by weights w, so we can do this using gradient descent, resulting in the weight update
@@ -250,7 +260,7 @@ This is called _semi-gradient descent_ because we keep the future estimate fixed
 We have also included the reward encountered in the transition to the next state, but this is zero unless the game is finished.
 The expression in brackets above is called the _TD error_.
 
-This method is an example of _boostrapping_: improving our estimate of the optimal value function based on earlier estimates.
+This method is an example of _bootstrapping_: improving our estimate of the optimal value function based on earlier estimates.
 
 <a name="eligibility" />
 
@@ -264,7 +274,8 @@ This uses an _eligibility trace_, which is an exponentially decaying average of 
 
 ![equation](https://latex.codecogs.com/gif.latex?z_{t&plus;1}&space;=&space;\lambda&space;z_t&space;&plus;&space;\nabla_w&space;v)
 <!-- z_{t+1} = \lambda z_t + \nabla_w v -->
-where the hyperparameter ![equation](https://latex.codecogs.com/gif.latex?\small&space;\lambda&space;\in&space;[0,&space;1]) specifies the decay rate, and thus the time scale over which previous moves are considered to have an impact on the current value.
+where the hyperparameter ![equation](https://latex.codecogs.com/gif.latex?\small&space;\lambda&space;\in&space;[0,&space;1]) specifies the decay rate, and thus the time scale over which previous moves are considered to have an impact on the current value. (A hyperparameter is a parameter that must be set by hand, in contrast
+to the parameters w which are learned by the algorithm.)
 
 When lambda is 0 we recover the previous 1-step TD, where only the last actions is held responsible for the result.
 At the other extreme when lambda is 1, all previous actions are held equally responsible, this is called Monte Carlo learning.
@@ -278,16 +289,16 @@ It is important to re-initialize the eligibility trace to zero at the start of e
 ## Search
 
 Again following TD-Gammon, we use a 2-ply search. 
-A ply is a single player's move, so a one ply search would be to look at all available moves, evaluate their afterstates, and choose the move with the highest value afterstate (or lowest for the blue player).
+A ply is a single player's move, so a one ply search would be to look at all available moves, evaluate their afterstates, and choose the move resulting in the highest value afterstate (or lowest for the blue player).
 A two ply search, as it is done in TD-Gammon and as we do here, works as follows. The afterstates found after 1-ply are not full states, they need to be supplemented with a new roll of the dice. We complete them in all possible ways, that is, with die rolls from 0 to 4.
-This then forms another full state, typically with the opponent to move (unless landing on a rosette). 
+This then forms another full state, typically with the opponent to move.
 For each of these states, we do another 1-ply search to find the move that is best for whoever's turn it is, and compute the value of the resulting afterstate.
-So now for a given initial move, we have the 5 possible die rolls combined with the value of the best following move's after state.
+So now for a given initial move, we have the 5 possible die rolls combined with the value of the best following move's afterstate.
 We sum these up, weighted with the probability of the corresponding die roll (these probabilities are (1, 4, 6, 4, 1)/16 for throws of 0, 1, 2, 3, 4 respectively).
 This gives the expected 2-ply afterstate value.
 The move we choose then is the one that maximizes this value.
 
-Note that there is one slight complication in Ur with respect to Backgammon, namely that the turn might not change, if we land on a rosette.
+Note that there is one slight complication in Ur with respect to Backgammon, namely that the turn does not change if we land on a rosette.
 This doesn't change the algorithm though, if we search for 2 ply regardless of whose move it is, and of course take care to choose the move appropriately depending on whose turn it is at either ply.
 
 <a name="selfplay"/>
@@ -315,7 +326,7 @@ On every move regardless of who made it we update the eligibility trace and the 
 <a name="details"/>
 
 ## Implementation Details
-Finally we discuss a few implementation details.
+
 
 ### Board Representation
 
@@ -327,35 +338,37 @@ The values in the array are simply zeros for absence of a stone and ones for pre
 with the color of the stone determined by the row it is on.
 The only exception are the first and last column indicating the number of stones at the start or finish, which range from 0 to 7.
 
-Before we input this board to the value network, we flip it if necessary so that the network always gets fed boards where it is  the red player's turn.
-Then we flatten the board into a 32-dimensional vector which is the input to the value network.
+Before this board is fed into the value network, it is flipped if necessary so that the network always gets fed boards where it is the red player's turn.
+Then it is flatted into a 32-dimensional feature vector which is the input to the value network. This computes some value v.
 To always output the value function as seen from the red player's point of view, which seems conceptually the simplest,
-we directly output the value if it actually was the red player's turn, and otherwise we output 1 - the computed value.
-This also enforces a symmetry present in the game, where if we mirror the board along the middle row and change turn, we obtain the same state, only with the roles of red and blue reversed.
+the final output is v if it was actually the red player's turn, and 1 - v otherwise.
+This also enforces a symmetry present in the game: mirroring the board along the middle row and changin the turn results in the same state, only with the roles of red and blue reversed.
 
 ### Jax
 
-To speed up the training, we made heavy use of jax, which has sped it up by a factor of 100, allowing play of about 1000 moves per second on a CPU.
+To speed up the training, I made heavy use of jax, a Python package for automatic differentiation and fast numerical computation.
+This has sped it up by a factor of 100, allowing play of about 1000 moves per second on a CPU.
 This involves adding `jit` decorators around often used functions, which automatically compiles them the first time they're run.
 It is actually a bit more involved, but only slightly. 
 For jax to be able to do this, it traces the function with abstract inputs that have only a shape and a type, but not values.
 If there are conditionals on values this will fail.
-So to use jax to its full extent, these conditionals should be converted as much as possible to arithmetic operations, which is what we have done.
-We have also used `grad` to compute the derivative of the value function in a single line, and `vmap` to compute the values of all legal moves in one batch, 
+So to use jax to its full extent, these conditionals should be converted as much as possible to arithmetic operations, which is what I have done.
+I have also used `grad` to compute the derivative of the value function in a single line, and `vmap` to compute the values of all legal moves in one batch, 
 without having to explicitly add the batch dimension in the code.
 
 ### TD error
 
-Finally, for the final TD error, when a game is finished, we use the reward minus the previous value, rather than the reward plus the next value minus the previous value. This is because we know the total return of the final state exactly, it is simply one if we have won and zero otherwise, so there is no need to bootstrap.
+Finally, for the final TD error, when a game is finished, I use the reward minus the previous value, rather than the reward plus the next value minus the previous value. 
+This is because at this point the return of the final state is known exactly, it is simply one if red has won and zero if blue has won, so there is no need to bootstrap.
 
 ### Initialization
 
 It is very important not to initialize the value network's parameters too large.
 In particular using Xavier initialization, appropriate for supervised learning with sigmoid activation, leads to large random initial biases that training through self-play cannot overcome.
-We initialize biases at zero and weights normally distributed, with standard deviation 1e-4.
+Biases are initialized at zero and weights normally distributed, with mean zero and  standard deviation 1e-4.
 
 ### Hyperparameters
-There are a number of hyperparameters in this setup, listed below with the values we tried in brackets:
+There are a number of hyperparameters in this setup, listed below with the values I tried in brackets:
 - hidden units N: 40 (20, 40, 80)
 - learning rate alpha: 0.01 (0.01, 0.003, 0.0003)
 - lambda: 0.9 (0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
@@ -364,25 +377,26 @@ There are a number of hyperparameters in this setup, listed below with the value
 
 I chose these by guessing what is reasonable, and then possibly experimenting with those and some lower and higher values.
 
-TD-Gammon used 40 or 80 units in different versions. Since Ur is much simpler than Backgammon, 40 seems reasonable, and we'll experiment with 20 and 80 too.
+TD-Gammon used 40 or 80 units in different versions. Since Ur is much simpler than Backgammon, 40 seems reasonable, and I experimented with 20 and 80 too.
 
 For the learning rate there is a heuristic (see Sutton & Barto), where if it is set to ![equation](https://latex.codecogs.com/gif.latex?\small&space;\alpha&space;=&space;\frac{1}{N&space;\mathbb{E}\[&space;\|x\|^2&space;\]}) where x is the feature vector, then it will take about
-N visits to a similar state to fully replace the previous value.
-Taking N=10 and estimating the average feature vector by using a previously trained agent, we obtain our middle guess of alpha = 0.003.
-Given the die roll probabilities in Ur, N=10 seems low in that it will be swayed by having several lucky or unlucky throws in a row from a similar state.
-However TD-Gammon used alpha = 0.1 (see [here](https://papers.nips.cc/paper/1991/file/68ce199ec2c5517597ce0a4d89620f55-Paper.pdf)), so this is a bit of a compromise, and we try 0.01, 0.003 and 0.0003.
+N visits to a similar state to fully replace the previous value. This is true for linear function approximation. While the neural network is nonlinear in the
+board features, it might still be a useful guideline.
+Taking N = 10 and estimating the average feature vector by using a previously trained agent gives the middle guess of alpha = 0.003.
+Given the die roll probabilities in Ur, N = 10 seems low in that it will be swayed by having several lucky or unlucky throws in a row from a similar state.
+However TD-Gammon used alpha = 0.1 (see [here](https://papers.nips.cc/paper/1991/file/68ce199ec2c5517597ce0a4d89620f55-Paper.pdf)), so this is a bit of a compromise, and I have tried 0.01, 0.003 and 0.0003.
 
 For lambda, TD-Gammon used 0.7. The random element seems more important in Ur, which I think brings the optimal lambda down.
-Nevertheless we experiment with a broad range of values from 0.5 to 0.95.
+Nevertheless I experimented with a broad range of values from 0.5 to 0.95.
 
 Epsilon is the parameter that controls the amount of exploration.
-The random element of the die rolls itself already gives rise to exploration of different states, so we set this to 0.
+The random element of the die rolls itself already gives rise to exploration of different states, so I've just set this to 0.
 
-We then train agents for all of the parameter combinations.
-After determining a good agent through some competitions, we can create what are called learning curves.
+I then train agents for all of the parameter combinations.
+After determining a good reference agent through some competitions, the learning process can be illustrated through what are called learning curves.
 These show how an agent improves with more training.
-For these curves, we compete the agent trained with a particular combination of hyperparameters for 1000 matches against a fixed relatively good other agent, and record the win percentage, which is what is plotted.
-Every 500 episodes of training the parameters are saved, and competed at this fixed agent.
+For these curves, the agent trained with a particular combination of hyperparameters competes for 1000 matches against a fixed relatively good fixed other agent.
+After every 500 episodes of training, the weights are saved and the resulting agent does this competition, resulting in a win percentage as a function of the number of training episodes.
 The plot below is for lambda = 0.9 and the values of N and alpha indicated.
 
 ![plot](./images/learning_curve.png)
@@ -390,10 +404,10 @@ The plot below is for lambda = 0.9 and the values of N and alpha indicated.
 There is a large amount of variance, mostly because of the evaluation metric, 1000 matches is still not enough to get an accurate estimate,
 but also because of the performance itself, it is not guaranteed to improve with more training.
 Most improvement happens in roughly the first 5000 episodes for the two larger learning rates, while the smallest is nowhere near converged yet.
-Even the larger two learning rates may still be improving.
+Even the larger two learning rates it looks like the agents are still improving.
 
 Another way to get some insight is with a parameter study. 
-Here we take as final performance of a given agent the previously calculated win rate averaged over the agent's last 5000 training episodes.
+Here the final performance of a given agent is taken as the previously calculated win rate averaged over the agent's last 5000 training episodes.
 
 ![plot](./images/parameter_study.png)
 
@@ -401,17 +415,18 @@ These plots show that more hidden units is generally better, in the chosen range
 And for the number of episodes trained, a larger alpha is generally better.
 Or in other words, more training may be beneficial.
 In regards to lambda, the two lower learning rates favor higher lambda, but this may be an artifact of the limited number of training episodes,
-as with a larger lambda, parameters are updated more often.
-The curves for alpha = 0.01 suggest an intermediate value of lambda is best, though the dip at lambda=0.7 might indicate that even here there is still
+as with a larger lambda, parameters are updated more strongly.
+The curves for alpha = 0.01 suggest an intermediate value of lambda is best, though the dip at lambda = 0.7 might indicate that even here there is still
 a lot of variance.
 
-Based on these results, we take N = 80 and lambda = 0.8 as the most promising candidates, and train agents with learning rates 0.01 and 0.003
-for a total of a 500,000 episodes each. The one with learning rate 0.01 turned out slightly better, so we take that as our final best agent.
-It won 62.8% of its games against our reference agent (over 10,000 games).
-This agent playing with a 2-ply search is what we refer to as TD-Ur.
+Based on these results, I've chosen N = 80 and lambda = 0.8 as the most promising candidates, and trained agents with learning rates 0.01 and 0.003
+for a total of a 500,000 episodes each. 
+The one with learning rate 0.01 turned out slightly better, so that is the final best agent.
+It won 62.8% of its games against the reference agent (over 10,000 games).
+This agent playing with a 2-ply search is what is referred to as TD-Ur.
 
 Finally, note that all the training has been done with only a 1-ply search. 
 In principle using a 2-ply search will change the training dynamics and probably improve the performance of the resulting weights when using a 2-ply 
 search during actual play. However it also slows down training by a factor of about 8.
-Therefore we limit to training with 1-ply search, and only use 2-ply search during actual play with a trained agent.
-Our best agent wins 53.5 percent of the time using 2-ply search versus itself using only a 1-ply search (over 10,000 games).
+Therefore I've limited training to 1-ply search, and only used 2-ply search during actual play with a trained agent.
+The best agent wins 53.5 percent of the time using 2-ply search versus itself using only a 1-ply search (over 10,000 games).
