@@ -64,8 +64,14 @@ class TDUr:
         return self.params
 
     def set_params(self, parameter_values):
-        """Set agent parameters. Must be compatible with `hidden_units` attribute."""
+        """Set agent parameters, modifies `hidden_units` attribute if necessary."""
         self.params = parameter_values
+        self.hidden_units = parameter_values[0][0].shape[0]
+
+    def set_best_params(self):
+        """Set agent parameters to best found values stored in `best_parameters`."""
+        best_params = pickle.load(open(os.path.join(os.path.dirname(__file__), 'best_parameters.pkl'), 'rb'))
+        self.set_params(best_params)
 
     def save_params(self, name, directory='parameters'):
         """Save the current agent parameters to a file, pickled.

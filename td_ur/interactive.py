@@ -87,16 +87,20 @@ class InteractiveGame:
 
     To use, run `play` method in Jupyter/Colab notebook.
     """
-    def __init__(self, agent_parameters, search_plies=2):
+    def __init__(self, agent_parameters=None, search_plies=2):
         """Construct an interactive Ur game.
 
         Args:
-            agent_parameters: The parameters of the agent's value function network.
+            agent_parameters: Optional, he parameters of the agent's value function network.
+                            defaults to None, meaning `best_parameters` are chosen.
             search_plies: Optional, how many ply to search for, 1 or 2, defaults to 2.
         """
         self.game = Ur()
-        self.agent = TDUr(hidden_units=agent_parameters[0][0].shape[0])
-        self.agent.set_params(agent_parameters)
+        self.agent = TDUr()
+        if agent_parameters is not None:
+            self.agent.set_params(agent_parameters)
+        else:
+            self.agent.set_best_params()
         self.search_plies = search_plies
 
         self.human = 0
