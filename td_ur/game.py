@@ -3,7 +3,6 @@ from matplotlib import pyplot as plt
 from matplotlib import colors
 from jax import jit, vmap
 import jax.numpy as jnp
-from jax.ops import index, index_update
 from functools import partial
 
 
@@ -220,11 +219,11 @@ class Ur:
 
         # end square does not contain player stone (or is finish)
         moves_with_legal_end = end_squares == 0
-        moves_with_legal_end = index_update(moves_with_legal_end, index[-1], True)
+        moves_with_legal_end = moves_with_legal_end.at[jnp.index[-1]].set(True)
 
         # it's not a capture on the safe space
         safe_space = jnp.zeros(finish + 1 - rolled, dtype='bool')
-        safe_space = index_update(safe_space, index[safe_square - rolled], True)
+        safe_space = safe_space.at[jnp.index[safe_square - rolled]].set(True)
         opponent_present = board[(turn + 1) % 2, rolled: finish + 1] > 0
         no_illegal_capture = ~(opponent_present & safe_space)
 
@@ -258,9 +257,9 @@ class Ur:
         # construct auxiliary boards to help with logic
         rosette_board = jnp.zeros(shape=board_width_internal, dtype='int8')
         for i in rosettes:
-            rosette_board = index_update(rosette_board, i, 1)
+            rosette_board = rosette_board.at[i].set(1)
         capture_board = jnp.zeros(shape=board_width_internal, dtype='int8')
-        capture_board = index_update(capture_board, (index[mid_start:mid_ended]), 1)
+        capture_board = capture_board.at[jnp.index[mid_start:mid_ended]].set(1)
 
         # capture, if opponent present and in capturable area
         other = (turn + 1) % 2
@@ -268,7 +267,7 @@ class Ur:
         values = values + [(1 - capture_board[end]) * board[other, end],
                            board[other, start] + capture_board[end] * board[other, end]]
 
-        new_board = index_update(board, (tuple(indices_x), tuple(indices_y)), tuple(values))
+        new_board = board.at[(tuple(indices_x), tuple(indices_y))].set(tuple(values))
 
         has_finished = 1 + jnp.sign(new_board[turn, finish] - n_pieces)
         # if the played move won the game, the winner must be the player who played it
