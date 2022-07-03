@@ -219,11 +219,11 @@ class Ur:
 
         # end square does not contain player stone (or is finish)
         moves_with_legal_end = end_squares == 0
-        moves_with_legal_end = moves_with_legal_end.at[jnp.index[-1]].set(True)
+        moves_with_legal_end = moves_with_legal_end.at[jnp.index_exp[-1]].set(True)
 
         # it's not a capture on the safe space
         safe_space = jnp.zeros(finish + 1 - rolled, dtype='bool')
-        safe_space = safe_space.at[jnp.index[safe_square - rolled]].set(True)
+        safe_space = safe_space.at[jnp.index_exp[safe_square - rolled]].set(True)
         opponent_present = board[(turn + 1) % 2, rolled: finish + 1] > 0
         no_illegal_capture = ~(opponent_present & safe_space)
 
@@ -259,7 +259,7 @@ class Ur:
         for i in rosettes:
             rosette_board = rosette_board.at[i].set(1)
         capture_board = jnp.zeros(shape=board_width_internal, dtype='int8')
-        capture_board = capture_board.at[jnp.index[mid_start:mid_ended]].set(1)
+        capture_board = capture_board.at[jnp.index_exp[mid_start:mid_ended]].set(1)
 
         # capture, if opponent present and in capturable area
         other = (turn + 1) % 2
