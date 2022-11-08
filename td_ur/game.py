@@ -102,7 +102,11 @@ class Ur:
         if self.rolled == 0:
             moves = []
         else:
-            moves_array = self._legal_moves_array(self._board_params, self.board, self.turn, self.rolled)
+            moves_array = self._legal_moves_array(
+                    self._board_params,
+                    self.board,
+                    int(self.turn),
+                    self.rolled)
             moves = np.where(moves_array)[0].tolist()
         return moves if moves else ['pass']
 
